@@ -1,13 +1,16 @@
 use std::ops;
 use std::fmt;
 use std::vec::Vec;
+use std::rc::Rc;
 
-
+#[derive(Debug, Clone)]
 struct Tensor {
     data: f32,
     grad: f32,
     prev: Vec<Tensor>,
 }
+
+struct RcTensorWrapper(Rc<Tensor>);
 
 
 impl Tensor {
@@ -24,10 +27,10 @@ impl fmt::Display for Tensor {
 }
 
 
-impl ops::Add for Tensor {
+impl ops::Add for RcTensorWrapper {
     type Output = Tensor;
 
-    fn add(self, other: Tensor) -> Tensor {
+    fn add(self, other: Self) -> Self::Output {
         println!("Tensor#add() on (Tensor(data={}), Tensor(data={}))", self.data, other.data);
         
         Tensor {
@@ -54,10 +57,18 @@ fn main() {
         prev: Vec::new(),
     };
     
+    let rc_tensor_a = Rc::new(tensor_a);
+    let rc_tensor_b = Rc::new(tensor_b);
 
-    tensor_a.backward();
 
-    let tensor_c = tensor_a + tensor_b;
 
+//    tensor_a.backward();
+    
+
+    let tensor_c = Rc::clone(&rc_tensor_a) + Rc::clone(&rc_tensor_b);
     println!("{}", tensor_c);
+
+//    let tensor_d = tensor_a + tensor_b;
+//    println!("{}", tensor_d);
 }
+
