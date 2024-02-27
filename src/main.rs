@@ -38,6 +38,20 @@ impl ops::Add for Tensor {
     }
 }
 
+impl ops::Mul for Tensor {
+    type Output = Tensor;
+
+    fn mul(self, other: Self) -> Self::Output {
+        println!("Tensor#mul() on ({}, {})", self, other);
+        
+        Tensor {
+            data: self.data * other.data,
+            grad: 0.0,
+            prev: vec![self, other],
+        }
+    }
+}
+
 
 fn main() {
     println!("Hello, world!");
@@ -70,4 +84,16 @@ fn main() {
 
     let tensor_f = tensor_b.clone() + tensor_c.clone();
     println!("{} + {} = {}", tensor_b, tensor_c, tensor_f);
+
+    let tensor_g = tensor_a.clone() * tensor_b.clone();
+    println!("{} * {} = {}", tensor_a, tensor_b, tensor_g);
+
+    let tensor_h = tensor_a.clone() * tensor_c.clone();
+    println!("{} * {} = {}", tensor_a, tensor_c, tensor_h);
+
+    let tensor_i = tensor_b.clone() * tensor_c.clone();
+    println!("{} * {} = {}", tensor_b, tensor_c, tensor_i);
+
+
+
 }
