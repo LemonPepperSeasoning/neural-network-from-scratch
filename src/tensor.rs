@@ -2,6 +2,7 @@ use std::ops;
 use std::fmt;
 use std::vec::Vec;
 
+
 #[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: f32,
@@ -38,6 +39,7 @@ impl ops::Add for Tensor {
     }
 }
 
+
 impl ops::Mul for Tensor {
     type Output = Self;
 
@@ -66,6 +68,18 @@ impl ops::Neg for Tensor {
         }
     }
 }
+
+
+impl ops::Sub for Tensor {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        println!("Tensor#sub() on ({}, {})", self, other);
+        
+        self + (-other)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -119,6 +133,7 @@ mod tests {
         assert_eq!(tensor_3.data, 0.000006);
     }
 
+
     #[test]
     fn test_neg() {
         let tensor_1 = -tensor_a(); 
@@ -128,6 +143,17 @@ mod tests {
         assert_eq!(tensor_1.data, -0.001);
         assert_eq!(tensor_2.data, -0.002);
         assert_eq!(tensor_3.data, -0.003);
+    }
+
+    #[test]
+    fn test_sub() {
+        let tensor_1 = tensor_a() - tensor_b(); 
+        let tensor_2 = tensor_b() - tensor_a();
+        let tensor_3 = tensor_c() - tensor_a();
+        
+        assert_eq!(tensor_1.data, -0.001);
+        assert_eq!(tensor_2.data, 0.001);
+        assert_eq!(tensor_3.data, 0.0019999999);
     }
 }
 
