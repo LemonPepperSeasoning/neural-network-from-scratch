@@ -1,56 +1,6 @@
-use std::ops;
-use std::fmt;
 use std::vec::Vec;
-
-#[derive(Debug, Clone)]
-struct Tensor {
-    data: f32,
-    grad: f32,
-    prev: Vec<Tensor>,
-}
-
-
-impl Tensor {
-    fn backward(&self) {
-        println!("Tensor#backward() on {}", self);
-    }
-}
-
-
-impl fmt::Display for Tensor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Tensor(data={})", self.data)
-    }
-}
-
-
-impl ops::Add for Tensor {
-    type Output = Tensor;
-
-    fn add(self, other: Self) -> Self::Output {
-        println!("Tensor#add() on ({}, {})", self, other);
-        
-        Tensor {
-            data: self.data + other.data,
-            grad: 0.0,
-            prev: vec![self, other],
-        }
-    }
-}
-
-impl ops::Mul for Tensor {
-    type Output = Tensor;
-
-    fn mul(self, other: Self) -> Self::Output {
-        println!("Tensor#mul() on ({}, {})", self, other);
-        
-        Tensor {
-            data: self.data * other.data,
-            grad: 0.0,
-            prev: vec![self, other],
-        }
-    }
-}
+mod tensor;
+pub use tensor::Tensor;
 
 
 fn main() {
