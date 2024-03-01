@@ -1,6 +1,8 @@
-use std::vec::Vec;
 mod tensor;
-pub use tensor::Tensor;
+mod neuron;
+use std::vec::Vec;
+use crate::neuron::Neuron;
+use crate::tensor::Tensor;
 
 
 fn main() {
@@ -46,4 +48,6 @@ fn main() {
 
 
 
+    let neuron_a = Neuron::new(3, true);
+    println!("{}", neuron_a);
 }
