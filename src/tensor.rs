@@ -4,14 +4,22 @@ use std::vec::Vec;
 
 
 #[derive(Debug, Clone)]
-pub struct Tensor<'a> {
+pub struct Tensor {
     pub data: f32,
     pub grad: f32,
-    pub prev: Vec<&'a Tensor>,
+    pub prev: Vec<Tensor>,
 }
 
 
 impl Tensor {
+    pub fn new(data: f32, grad: f32) -> Self {
+        Tensor {
+            data: data,
+            grad: grad,
+            prev: Vec::new() 
+        }
+    }
+
     pub fn backward(&self) {
         println!("Tensor#backward() on {}", self);
     }
@@ -25,58 +33,54 @@ impl fmt::Display for Tensor {
 }
 
 
-impl ops::Add<&Self> for Tensor {
-    type Output = Self;
+impl ops::Add for &Tensor {
+    type Output = Tensor;
 
-    fn add(self, other: &Self) -> Self::Output {
+    fn add(self, other: Self) -> Self::Output {
         println!("Tensor#add() on ({}, {})", self, other);
-        
         Tensor {
             data: self.data + other.data,
             grad: 0.0,
-            prev: vec![self, other],
+            prev: vec![self.clone(), other.clone()],
         }
     }
 }
 
 
-impl ops::Mul<&Self> for Tensor {
-    type Output = Self;
+impl ops::Mul for &Tensor {
+    type Output = Tensor;
 
-    fn mul(self, other: &Self) -> Self::Output {
+    fn mul(self, other: Self) -> Self::Output {
         println!("Tensor#mul() on ({}, {})", self, other);
-        
         Tensor {
             data: self.data * other.data,
             grad: 0.0,
-            prev: vec![self, other],
+            prev: vec![self.clone(), other.clone()],
         }
     }
 }
 
 
-impl ops::Neg for Tensor {
-    type Output = Self;
+impl ops::Neg for &Tensor {
+    type Output = Tensor;
 
     fn neg(self) -> Self::Output {
         println!("Tensor#neg() on {}", self);
-        
         Tensor {
             data: -self.data,
             grad: 0.0,
-            prev: vec![&self],
+            prev: vec![self.clone()],
         }
     }
 }
 
 
-impl ops::Sub<&Self> for Tensor {
-    type Output = Self;
+impl ops::Sub for &Tensor {
+    type Output = Tensor;
 
-    fn sub(self, other: &Self) -> Self::Output {
+    fn sub(self, other: Self) -> Self::Output {
         println!("Tensor#sub() on ({}, {})", self, other);
-        
-        self + (-&other)
+        self + &(-other)
     }
 }
 
@@ -86,29 +90,16 @@ mod tests {
     use super::*;
 
     fn tensor_a() -> Tensor {
-        Tensor {
-            data: 0.001,
-            grad: 0.0,
-            prev: Vec::new(),
-        }
+        Tensor::new(0.001, 0.0)
     }
 
     fn tensor_b() -> Tensor {
-        Tensor {
-            data: 0.002,
-            grad: 0.0,
-            prev: Vec::new(),
-        }
+        Tensor::new(0.002, 0.0) 
     }
     
     fn tensor_c() -> Tensor {
-        Tensor {
-            data: 0.003,
-            grad: 0.0,
-            prev: Vec::new(),
-        }
+        Tensor::new(0.003, 0.0)
     }
-
 
     #[test]
     fn test_add() {

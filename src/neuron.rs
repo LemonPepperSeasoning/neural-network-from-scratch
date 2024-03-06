@@ -43,3 +43,4 @@ impl Neuron {
         Self {w, b}
     }
 }
+
