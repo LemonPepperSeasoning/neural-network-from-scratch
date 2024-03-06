@@ -4,10 +4,10 @@ use std::vec::Vec;
 
 
 #[derive(Debug, Clone)]
-pub struct Tensor {
+pub struct Tensor<'a> {
     pub data: f32,
     pub grad: f32,
-    pub prev: Vec<Tensor>,
+    pub prev: Vec<&'a Tensor>,
 }
 
 
@@ -25,10 +25,10 @@ impl fmt::Display for Tensor {
 }
 
 
-impl ops::Add for Tensor {
+impl ops::Add<&Self> for Tensor {
     type Output = Self;
 
-    fn add(self, other: Self) -> Self::Output {
+    fn add(self, other: &Self) -> Self::Output {
         println!("Tensor#add() on ({}, {})", self, other);
         
         Tensor {
@@ -40,10 +40,10 @@ impl ops::Add for Tensor {
 }
 
 
-impl ops::Mul for Tensor {
+impl ops::Mul<&Self> for Tensor {
     type Output = Self;
 
-    fn mul(self, other: Self) -> Self::Output {
+    fn mul(self, other: &Self) -> Self::Output {
         println!("Tensor#mul() on ({}, {})", self, other);
         
         Tensor {
@@ -64,19 +64,19 @@ impl ops::Neg for Tensor {
         Tensor {
             data: -self.data,
             grad: 0.0,
-            prev: vec![self],
+            prev: vec![&self],
         }
     }
 }
 
 
-impl ops::Sub for Tensor {
+impl ops::Sub<&Self> for Tensor {
     type Output = Self;
 
-    fn sub(self, other: Self) -> Self::Output {
+    fn sub(self, other: &Self) -> Self::Output {
         println!("Tensor#sub() on ({}, {})", self, other);
         
-        self + (-other)
+        self + (-&other)
     }
 }
 
@@ -112,9 +112,9 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let tensor_1 = tensor_a() + tensor_b(); 
-        let tensor_2 = tensor_a() + tensor_c();
-        let tensor_3 = tensor_b() + tensor_c();
+        let tensor_1 = &tensor_a() + &tensor_b(); 
+        let tensor_2 = &tensor_a() + &tensor_c();
+        let tensor_3 = &tensor_b() + &tensor_c();
         
         assert_eq!(tensor_1.data, 0.003);
         assert_eq!(tensor_2.data, 0.004);
@@ -124,9 +124,9 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let tensor_1 = tensor_a() * tensor_b(); 
-        let tensor_2 = tensor_a() * tensor_c();
-        let tensor_3 = tensor_b() * tensor_c();
+        let tensor_1 = &tensor_a() * &tensor_b(); 
+        let tensor_2 = &tensor_a() * &tensor_c();
+        let tensor_3 = &tensor_b() * &tensor_c();
         
         assert_eq!(tensor_1.data, 0.0000020000002);
         assert_eq!(tensor_2.data, 0.000003);
@@ -136,9 +136,9 @@ mod tests {
 
     #[test]
     fn test_neg() {
-        let tensor_1 = -tensor_a(); 
-        let tensor_2 = -tensor_b();
-        let tensor_3 = -tensor_c();
+        let tensor_1 = -&tensor_a(); 
+        let tensor_2 = -&tensor_b();
+        let tensor_3 = -&tensor_c();
         
         assert_eq!(tensor_1.data, -0.001);
         assert_eq!(tensor_2.data, -0.002);
@@ -147,9 +147,9 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        let tensor_1 = tensor_a() - tensor_b(); 
-        let tensor_2 = tensor_b() - tensor_a();
-        let tensor_3 = tensor_c() - tensor_a();
+        let tensor_1 = &tensor_a() - &tensor_b(); 
+        let tensor_2 = &tensor_b() - &tensor_a();
+        let tensor_3 = &tensor_c() - &tensor_a();
         
         assert_eq!(tensor_1.data, -0.001);
         assert_eq!(tensor_2.data, 0.001);
