@@ -29,18 +29,26 @@ impl Neuron {
     pub fn new(nin: usize, nonlin: bool) -> Self {
         let mut rng = rand::thread_rng();
         let w: Vec<Tensor> = (0..nin)
-            .map(|_| Tensor{ 
-                data: rng.gen_range(-1.0..1.0), 
-                grad: 0.0, 
-                prev: Vec::new()
-            })
+            .map(|_| Tensor::new(rng.gen_range(-1.0..1.0), 0.0))
             .collect();
-        let b = Tensor{
-            data: 0.0, 
-            grad: 0.0, 
-            prev: Vec::new()
-        };
+        let b = Tensor::new(0.0, 0.0);
         Self {w, b}
+    }
+
+    pub fn parameters(&self) -> Vec<Tensor> {
+        self.w.iter().map(|x| x + &self.b).collect()
     }
 }
 
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parameters() { 
+        let neuron_a = Neuron::new(2, true);
+        let params = neuron_a.parameters();
+        assert_eq!(params.len(), 2);
+    }
+}
