@@ -7,9 +7,9 @@ use crate::tensor::Tensor;
 fn main() {
     println!("Hello, world!");
 
-    let mut tensor_a = Tensor::new(0.001, 0.0);    
-    let mut tensor_b = Tensor::new(0.002, 0.0);
-    let mut tensor_c = Tensor::new(0.003, 0.0);
+    let mut tensor_a = Tensor::new(0.001);    
+    let mut tensor_b = Tensor::new(0.002);
+    let mut tensor_c = Tensor::new(0.003);
 
     tensor_a.backward();
 

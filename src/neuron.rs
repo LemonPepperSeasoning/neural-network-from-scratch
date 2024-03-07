@@ -4,7 +4,6 @@ use std::vec::Vec;
 use crate::tensor::Tensor;
 
 
-#[derive(Debug, Clone)]
 pub struct Neuron {
     pub w: Vec<Tensor>,
     pub b: Tensor,
@@ -29,9 +28,9 @@ impl Neuron {
     pub fn new(nin: usize, nonlin: bool) -> Self {
         let mut rng = rand::thread_rng();
         let w: Vec<Tensor> = (0..nin)
-            .map(|_| Tensor::new(rng.gen_range(-1.0..1.0), 0.0))
+            .map(|_| Tensor::new(rng.gen_range(-1.0..1.0)))
             .collect();
-        let b = Tensor::new(0.0, 0.0);
+        let b = Tensor::new(0.0);
         Self {w, b}
     }
 

@@ -2,26 +2,27 @@ use std::ops;
 use std::fmt;
 use std::vec::Vec;
 
-
-#[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: f32,
     pub grad: f32,
     pub prev: Vec<Tensor>,
+    pub _backward: Box<dyn FnMut()>,
+}
+
+fn default_backward_fn() {
+    println!("running default_backward()");
 }
 
 
 impl Tensor {
-    pub fn new(data: f32, grad: f32) -> Self {
-        Tensor {
-            data: data,
-            grad: grad,
-            prev: Vec::new() 
-        }
+    pub fn new(data: f32) -> Self {
+        let _backward = Box::new(|| {});
+        Self {data, grad: 0.0, prev: Vec::new(), _backward}
     }
 
     pub fn backward(&self) {
         println!("Tensor#backward() on {}", self);
+        (self._backward)();
     }
 }
 
@@ -38,11 +39,30 @@ impl ops::Add for &Tensor {
 
     fn add(self, other: Self) -> Self::Output {
         println!("Tensor#add() on ({}, {})", self, other);
-        Tensor {
+        let out = Tensor {
             data: self.data + other.data,
             grad: 0.0,
-            prev: vec![self.clone(), other.clone()],
+            prev: vec![*self, *other],
+            _backward: Box::new(|| {}),
+        };
+
+/*        fn _backward() {
+            println!("running _backwards()");
+            self.grad += out.grad;
+            other.grad += out.grad;
         }
+        out._backward = _backward;
+*/
+
+        let _backward = move || {
+            println!("running _backward()");
+            self.grad += out.grad;
+            other.grad += out.grad;
+        };
+
+        // Assign the closure to _backward field
+        out._backward = Box::new(_backward);
+        out
     }
 }
 
@@ -55,7 +75,8 @@ impl ops::Mul for &Tensor {
         Tensor {
             data: self.data * other.data,
             grad: 0.0,
-            prev: vec![self.clone(), other.clone()],
+            prev: vec![*self, *other],
+            _backward: Box::new(|| {}),
         }
     }
 }
@@ -69,7 +90,8 @@ impl ops::Neg for &Tensor {
         Tensor {
             data: -self.data,
             grad: 0.0,
-            prev: vec![self.clone()],
+            prev: vec![*self],
+            _backward: Box::new(|| {}),
         }
     }
 }
@@ -90,15 +112,15 @@ mod tests {
     use super::*;
 
     fn tensor_a() -> Tensor {
-        Tensor::new(0.001, 0.0)
+        Tensor::new(0.001)
     }
 
     fn tensor_b() -> Tensor {
-        Tensor::new(0.002, 0.0) 
+        Tensor::new(0.002) 
     }
     
     fn tensor_c() -> Tensor {
-        Tensor::new(0.003, 0.0)
+        Tensor::new(0.003)
     }
 
     #[test]
@@ -110,6 +132,9 @@ mod tests {
         assert_eq!(tensor_1.data, 0.003);
         assert_eq!(tensor_2.data, 0.004);
         assert_eq!(tensor_3.data, 0.005);
+
+        //tensor_1._backward();
+        assert_eq!(tensor_1.grad, 0.0);
     }
 
 
@@ -145,6 +170,6 @@ mod tests {
         assert_eq!(tensor_1.data, -0.001);
         assert_eq!(tensor_2.data, 0.001);
         assert_eq!(tensor_3.data, 0.0019999999);
-    }
+    }   
 }
 
