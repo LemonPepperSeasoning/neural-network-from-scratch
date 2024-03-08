@@ -11,7 +11,7 @@ pub struct Tensor {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RcTensor(Rc<Tensor>);
+pub struct RcTensor(pub Rc<Tensor>);
 
 impl RcTensor {
     pub fn new(tensor: Tensor) -> Self {
@@ -126,16 +126,16 @@ mod tests {
         assert_eq!(a_add_c.0.grad, 0.0);
 
         assert_eq!(a_add_b.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
-            RcTensor::new((Tensor::new(0.002))),
+            RcTensor::new(Tensor::new(0.001)),
+            RcTensor::new(Tensor::new(0.002)),
         ]);
         assert_eq!(b_add_c.0.prev, vec![
-            RcTensor::new((Tensor::new(0.002))),
-            RcTensor::new((Tensor::new(0.003))),
+            RcTensor::new(Tensor::new(0.002)),
+            RcTensor::new(Tensor::new(0.003)),
         ]);
         assert_eq!(a_add_c.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
-            RcTensor::new((Tensor::new(0.003))),
+            RcTensor::new(Tensor::new(0.001)),
+            RcTensor::new(Tensor::new(0.003)),
         ]);
     }
 
@@ -159,16 +159,16 @@ mod tests {
         assert_eq!(a_mul_c.0.grad, 0.0);
 
         assert_eq!(a_mul_b.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
-            RcTensor::new((Tensor::new(0.002))),
+            RcTensor::new(Tensor::new(0.001)),
+            RcTensor::new(Tensor::new(0.002)),
         ]);
         assert_eq!(b_mul_c.0.prev, vec![
-            RcTensor::new((Tensor::new(0.002))),
-            RcTensor::new((Tensor::new(0.003))),
+            RcTensor::new(Tensor::new(0.002)),
+            RcTensor::new(Tensor::new(0.003)),
         ]);
         assert_eq!(a_mul_c.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
-            RcTensor::new((Tensor::new(0.003))),
+            RcTensor::new(Tensor::new(0.001)),
+            RcTensor::new(Tensor::new(0.003)),
         ]);
     }
 
@@ -192,13 +192,13 @@ mod tests {
         assert_eq!(neg_c.0.grad, 0.0);
 
         assert_eq!(neg_a.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
+            RcTensor::new(Tensor::new(0.001)),
         ]);
         assert_eq!(neg_b.0.prev, vec![
-            RcTensor::new((Tensor::new(0.002))),
+            RcTensor::new(Tensor::new(0.002)),
         ]);
         assert_eq!(neg_c.0.prev, vec![
-            RcTensor::new((Tensor::new(0.003))),
+            RcTensor::new(Tensor::new(0.003)),
         ]);
     }
 
@@ -222,48 +222,16 @@ mod tests {
         assert_eq!(c_sub_a.0.grad, 0.0);
 
         assert_eq!(a_sub_b.0.prev, vec![
-            RcTensor::new((Tensor::new(0.001))),
-            RcTensor::new((Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] })),
+            RcTensor::new(Tensor::new(0.001)),
+            RcTensor::new(Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] }),
         ]);
         assert_eq!(c_sub_b.0.prev, vec![
-            RcTensor::new((Tensor::new(0.003))),
-            RcTensor::new((Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] })),
+            RcTensor::new(Tensor::new(0.003)),
+            RcTensor::new(Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] }),
         ]);
         assert_eq!(c_sub_a.0.prev, vec![
-            RcTensor::new((Tensor::new(0.003))),
-            RcTensor::new((Tensor { data: -0.001, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.001))] })),
+            RcTensor::new(Tensor::new(0.003)),
+            RcTensor::new(Tensor { data: -0.001, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.001))] }),
         ]);
     }
-
-    // #[test]
-    // fn test_neg() {
-    //     let tensor_a = RcTensor::new(Tensor::new(0.001, 0.0));
-    //     let tensor_b = RcTensor::new(Tensor::new(0.002, 0.0));
-    //     let tensor_c = RcTensor::new(Tensor::new(0.003, 0.0));
-
-    //     let tensor_1 = -&tensor_a();
-    //     let tensor_2 = -&tensor_b();
-    //     let tensor_3 = -&tensor_c();
-
-    //     assert_eq!(tensor_1.data, -0.001);
-    //     assert_eq!(tensor_2.data, -0.002);
-    //     assert_eq!(tensor_3.data, -0.003);
-    // }
-
-    // #[test]
-    // fn test_sub() {
-    //     let tensor_a = RcTensor::new(Tensor::new(0.001, 0.0));
-    //     let tensor_b = RcTensor::new(Tensor::new(0.002, 0.0));
-    //     let tensor_c = RcTensor::new(Tensor::new(0.003, 0.0));
-
-
-    //     let tensor_1 = &tensor_a() - &tensor_b();
-    //     let tensor_2 = &tensor_b() - &tensor_a();
-    //     let tensor_3 = &tensor_c() - &tensor_a();
-
-    //     assert_eq!(tensor_1.data, -0.001);
-    //     assert_eq!(tensor_2.data, 0.001);
-    //     assert_eq!(tensor_3.data, 0.0019999999);
-    // }
 }
-
