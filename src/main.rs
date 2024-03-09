@@ -1,8 +1,7 @@
-mod tensor;
 mod neuron;
+mod tensor;
 use crate::neuron::Neuron;
 use crate::tensor::Tensor;
-
 
 fn main() {
     println!("Hello, world!");
@@ -30,8 +29,6 @@ fn main() {
 
     // let tensor_i = &tensor_b * &tensor_c;
     // println!("{} * {} = {}", tensor_b, tensor_c, tensor_i);
-
-
 
     let neuron_a = Neuron::new(3, true);
     println!("{}", neuron_a);

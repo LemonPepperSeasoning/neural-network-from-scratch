@@ -1,15 +1,13 @@
+use crate::tensor::{RcTensor, Tensor};
 use rand::Rng;
 use std::fmt;
 use std::vec::Vec;
-use crate::tensor::{RcTensor, Tensor};
-
 
 #[derive(Debug, Clone)]
 pub struct Neuron {
     pub w: Vec<RcTensor>,
     pub b: RcTensor,
 }
-
 
 impl fmt::Display for Neuron {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -24,7 +22,6 @@ impl fmt::Display for Neuron {
     }
 }
 
-
 impl Neuron {
     pub fn new(nin: usize, nonlin: bool) -> Self {
         let mut rng = rand::thread_rng();
@@ -32,14 +29,16 @@ impl Neuron {
             .map(|_| RcTensor::new(Tensor::new(rng.gen_range(-1.0..1.0))))
             .collect();
         let b = RcTensor::new(Tensor::new(0.0));
-        Self {w, b}
+        Self { w, b }
     }
 
     pub fn parameters(&self) -> Vec<RcTensor> {
-        self.w.iter().map(|x| RcTensor::clone(x) + RcTensor::clone(&self.b)).collect()
+        self.w
+            .iter()
+            .map(|x| RcTensor::clone(x) + RcTensor::clone(&self.b))
+            .collect()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
