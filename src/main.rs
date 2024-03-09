@@ -30,6 +30,6 @@ fn main() {
     // let tensor_i = &tensor_b * &tensor_c;
     // println!("{} * {} = {}", tensor_b, tensor_c, tensor_i);
 
-    let neuron_a = Neuron::new(3, true);
+    let neuron_a = Neuron::new(3);
     println!("{}", neuron_a);
 }
