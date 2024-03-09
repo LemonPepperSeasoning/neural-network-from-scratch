@@ -42,7 +42,7 @@ impl Neuron {
 
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -51,11 +51,11 @@ mod test {
         let params = neuron_a.parameters();
 
         assert_eq!(params.len(), 3);
-        assert_eq!(params[0].0.grad, 0.0);
-        assert_eq!(params[1].0.grad, 0.0);
-        assert_eq!(params[2].0.grad, 0.0);
+        assert_eq!(params[0].0.borrow().grad, 0.0);
+        assert_eq!(params[1].0.borrow().grad, 0.0);
+        assert_eq!(params[2].0.borrow().grad, 0.0);
 
-        println!("{}", params[0].0.prev[0]);
+        println!("{}", params[0].0.borrow().prev[0]);
         // assert_eq!(params[0].0.prev, Vec::new());
     }
 }

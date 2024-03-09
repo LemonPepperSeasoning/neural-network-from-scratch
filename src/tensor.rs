@@ -2,6 +2,7 @@ use std::ops;
 use std::fmt;
 use std::vec::Vec;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tensor {
@@ -11,11 +12,11 @@ pub struct Tensor {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RcTensor(pub Rc<Tensor>);
+pub struct RcTensor(pub Rc<RefCell<Tensor>>);
 
 impl RcTensor {
     pub fn new(tensor: Tensor) -> Self {
-        RcTensor(Rc::new(tensor))
+        RcTensor(Rc::new(RefCell::new(tensor)))
     }
 
     pub fn clone(self: &RcTensor) -> Self {
@@ -24,7 +25,7 @@ impl RcTensor {
 }
 
 impl Tensor {
-    pub fn new(data: f32) -> Tensor {
+    pub fn new(data: f32) -> Self {
         Tensor {
             data: data,
             grad: 0f32,
@@ -32,8 +33,9 @@ impl Tensor {
         }
     }
 
-    pub fn backward(&self) {
+    pub fn backward(&mut self) {
         println!("Tensor#backward() on {}", self);
+        self.grad += 1.0;
     }
 }
 
@@ -45,7 +47,7 @@ impl fmt::Display for Tensor {
 
 impl fmt::Display for RcTensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "RcTensor(data={})", self.0.data)
+        write!(f, "RcTensor(data={})", self.0.borrow().data)
     }
 }
 
@@ -55,11 +57,11 @@ impl ops::Add for RcTensor {
 
     fn add(self, other: Self) -> Self::Output {
         println!("Tensor#add() on ({}, {})", self, other);
-        RcTensor(Rc::new(Tensor {
-            data: self.0.data + other.0.data,
+        RcTensor(Rc::new(RefCell::new(Tensor {
+            data: self.0.borrow().data + other.0.borrow().data,
             grad: 0.0,
             prev: vec![RcTensor::clone(&self), RcTensor::clone(&other)],
-        }))
+        })))
     }
 }
 
@@ -69,11 +71,11 @@ impl ops::Mul for RcTensor {
 
     fn mul(self, other: Self) -> Self::Output {
         println!("Tensor#mul() on ({}, {})", self, other);
-        RcTensor(Rc::new(Tensor {
-            data: self.0.data * other.0.data,
+        RcTensor(Rc::new(RefCell::new(Tensor {
+            data: self.0.borrow().data * other.0.borrow().data,
             grad: 0f32,
             prev: vec![RcTensor::clone(&self), RcTensor::clone(&other)],
-        }))
+        })))
     }
 }
 
@@ -84,11 +86,11 @@ impl ops::Neg for RcTensor {
     fn neg(self) -> Self::Output {
         println!("Tensor#neg() on {}", self);
 
-        RcTensor(Rc::new(Tensor {
-            data: -self.0.data,
+        RcTensor(Rc::new(RefCell::new(Tensor {
+            data: -self.0.borrow().data,
             grad: 0f32,
             prev: vec![RcTensor::clone(&self)],
-        }))
+        })))
     }
 }
 
@@ -109,34 +111,42 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
-        let tensor_b: RcTensor = RcTensor::new(Tensor::new(0.002));
-        let tensor_c: RcTensor = RcTensor::new(Tensor::new(0.003));
+        let mut tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
+        let mut tensor_b: RcTensor = RcTensor::new(Tensor::new(0.002));
+        let mut tensor_c: RcTensor = RcTensor::new(Tensor::new(0.003));
 
         let a_add_b: RcTensor = RcTensor::clone(&tensor_a) + RcTensor::clone(&tensor_b);
         let b_add_c: RcTensor = RcTensor::clone(&tensor_b) + RcTensor::clone(&tensor_c);
         let a_add_c: RcTensor = RcTensor::clone(&tensor_a) + RcTensor::clone(&tensor_c);
 
-        assert_eq!(a_add_b.0.data, 0.003);
-        assert_eq!(b_add_c.0.data, 0.005);
-        assert_eq!(a_add_c.0.data, 0.004);
+        assert_eq!(a_add_b.0.borrow().data, 0.003);
+        assert_eq!(b_add_c.0.borrow().data, 0.005);
+        assert_eq!(a_add_c.0.borrow().data, 0.004);
 
-        assert_eq!(a_add_b.0.grad, 0.0);
-        assert_eq!(b_add_c.0.grad, 0.0);
-        assert_eq!(a_add_c.0.grad, 0.0);
+        assert_eq!(a_add_b.0.borrow().grad, 0.0);
+        assert_eq!(b_add_c.0.borrow().grad, 0.0);
+        assert_eq!(a_add_c.0.borrow().grad, 0.0);
 
-        assert_eq!(a_add_b.0.prev, vec![
+        assert_eq!(a_add_b.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
             RcTensor::new(Tensor::new(0.002)),
         ]);
-        assert_eq!(b_add_c.0.prev, vec![
+        assert_eq!(b_add_c.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.002)),
             RcTensor::new(Tensor::new(0.003)),
         ]);
-        assert_eq!(a_add_c.0.prev, vec![
+        assert_eq!(a_add_c.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
             RcTensor::new(Tensor::new(0.003)),
         ]);
+
+        tensor_a.0.borrow_mut().backward();
+        tensor_b.0.borrow_mut().backward();
+        tensor_c.0.borrow_mut().backward();
+
+        assert_eq!(tensor_a.0.borrow().grad, 1.0);
+        assert_eq!(tensor_b.0.borrow().grad, 1.0);
+        assert_eq!(tensor_c.0.borrow().grad, 1.0);
     }
 
 
@@ -150,23 +160,23 @@ mod tests {
         let b_mul_c: RcTensor = RcTensor::clone(&tensor_b) * RcTensor::clone(&tensor_c);
         let a_mul_c: RcTensor = RcTensor::clone(&tensor_a) * RcTensor::clone(&tensor_c);
 
-        assert_eq!(a_mul_b.0.data, 0.0000020000002);
-        assert_eq!(b_mul_c.0.data, 0.000006);
-        assert_eq!(a_mul_c.0.data, 0.000003);
+        assert_eq!(a_mul_b.0.borrow().data, 0.0000020000002);
+        assert_eq!(b_mul_c.0.borrow().data, 0.000006);
+        assert_eq!(a_mul_c.0.borrow().data, 0.000003);
 
-        assert_eq!(a_mul_b.0.grad, 0.0);
-        assert_eq!(b_mul_c.0.grad, 0.0);
-        assert_eq!(a_mul_c.0.grad, 0.0);
+        assert_eq!(a_mul_b.0.borrow().grad, 0.0);
+        assert_eq!(b_mul_c.0.borrow().grad, 0.0);
+        assert_eq!(a_mul_c.0.borrow().grad, 0.0);
 
-        assert_eq!(a_mul_b.0.prev, vec![
+        assert_eq!(a_mul_b.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
             RcTensor::new(Tensor::new(0.002)),
         ]);
-        assert_eq!(b_mul_c.0.prev, vec![
+        assert_eq!(b_mul_c.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.002)),
             RcTensor::new(Tensor::new(0.003)),
         ]);
-        assert_eq!(a_mul_c.0.prev, vec![
+        assert_eq!(a_mul_c.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
             RcTensor::new(Tensor::new(0.003)),
         ]);
@@ -183,21 +193,21 @@ mod tests {
         let neg_b: RcTensor = - RcTensor::clone(&tensor_b);
         let neg_c: RcTensor = - RcTensor::clone(&tensor_c);
 
-        assert_eq!(neg_a.0.data, -0.001);
-        assert_eq!(neg_b.0.data, -0.002);
-        assert_eq!(neg_c.0.data, -0.003);
+        assert_eq!(neg_a.0.borrow().data, -0.001);
+        assert_eq!(neg_b.0.borrow().data, -0.002);
+        assert_eq!(neg_c.0.borrow().data, -0.003);
 
-        assert_eq!(neg_a.0.grad, 0.0);
-        assert_eq!(neg_b.0.grad, 0.0);
-        assert_eq!(neg_c.0.grad, 0.0);
+        assert_eq!(neg_a.0.borrow().grad, 0.0);
+        assert_eq!(neg_b.0.borrow().grad, 0.0);
+        assert_eq!(neg_c.0.borrow().grad, 0.0);
 
-        assert_eq!(neg_a.0.prev, vec![
+        assert_eq!(neg_a.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
         ]);
-        assert_eq!(neg_b.0.prev, vec![
+        assert_eq!(neg_b.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.002)),
         ]);
-        assert_eq!(neg_c.0.prev, vec![
+        assert_eq!(neg_c.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.003)),
         ]);
     }
@@ -213,23 +223,23 @@ mod tests {
         let c_sub_b: RcTensor = RcTensor::clone(&tensor_c) - RcTensor::clone(&tensor_b);
         let c_sub_a: RcTensor = RcTensor::clone(&tensor_c) - RcTensor::clone(&tensor_a);
 
-        assert_eq!(a_sub_b.0.data, -0.001);
-        assert_eq!(c_sub_b.0.data, 0.0009999999);
-        assert_eq!(c_sub_a.0.data, 0.0019999999);
+        assert_eq!(a_sub_b.0.borrow().data, -0.001);
+        assert_eq!(c_sub_b.0.borrow().data, 0.0009999999);
+        assert_eq!(c_sub_a.0.borrow().data, 0.0019999999);
 
-        assert_eq!(a_sub_b.0.grad, 0.0);
-        assert_eq!(c_sub_b.0.grad, 0.0);
-        assert_eq!(c_sub_a.0.grad, 0.0);
+        assert_eq!(a_sub_b.0.borrow().grad, 0.0);
+        assert_eq!(c_sub_b.0.borrow().grad, 0.0);
+        assert_eq!(c_sub_a.0.borrow().grad, 0.0);
 
-        assert_eq!(a_sub_b.0.prev, vec![
+        assert_eq!(a_sub_b.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.001)),
             RcTensor::new(Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] }),
         ]);
-        assert_eq!(c_sub_b.0.prev, vec![
+        assert_eq!(c_sub_b.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.003)),
             RcTensor::new(Tensor { data: -0.002, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.002))] }),
         ]);
-        assert_eq!(c_sub_a.0.prev, vec![
+        assert_eq!(c_sub_a.0.borrow().prev, vec![
             RcTensor::new(Tensor::new(0.003)),
             RcTensor::new(Tensor { data: -0.001, grad: 0.0, prev: vec![RcTensor::new(Tensor::new(0.001))] }),
         ]);
