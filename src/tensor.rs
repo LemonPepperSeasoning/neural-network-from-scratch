@@ -14,7 +14,7 @@ fn get_id() -> usize {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum Ops {
+pub enum Ops {
     ADD,
     MUL,
     NEG,
@@ -51,7 +51,7 @@ impl RcTensor {
         RcTensor(Rc::clone(&self.0))
     }
 
-    pub fn tanh(&mut self) -> Self {
+    pub fn tanh(&self) -> Self {
         println!("Tensor#tanh() on ({})", self);
         RcTensor(Rc::new(RefCell::new(Tensor {
             uid: get_id(),
@@ -81,7 +81,7 @@ impl RcTensor {
         }
 
         // Iterate over list & for eaach, run backward()
-        for mut rc_tensor in ordered_list {
+        for rc_tensor in ordered_list {
             rc_tensor.0.borrow_mut().backward();
         }
     }
@@ -109,8 +109,8 @@ impl Tensor {
                 assert_eq!(self.prev.len(), 2);
                 let mut tensor_1 = self.prev[0].0.borrow_mut();
                 let mut tensor_2 = self.prev[1].0.borrow_mut();
-                tensor_1.grad += (self.grad * tensor_2.data);
-                tensor_2.grad += (self.grad * tensor_1.data);
+                tensor_1.grad += self.grad * tensor_2.data;
+                tensor_2.grad += self.grad * tensor_1.data;
             }
             Ops::NEG => println!("Should not happen"),
             Ops::TANH => {
@@ -119,7 +119,6 @@ impl Tensor {
                 tensor_1.grad += 1f32 - tensor_1.data.tanh().powf(2f32);
             }
             Ops::NULL => println!("backwards do nothing"),
-            _ => println!("Should not happen"),
         }
     }
 }

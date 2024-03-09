@@ -2,7 +2,6 @@ use crate::tensor::{RcTensor, Tensor};
 use rand::Rng;
 use std::fmt;
 use std::iter::zip;
-use std::rc::Rc;
 use std::vec::Vec;
 
 #[derive(Debug, Clone)]
@@ -34,11 +33,11 @@ impl Neuron {
         Self { w, b }
     }
 
-    pub fn feed_foward(self, tensors: Vec<RcTensor>) -> RcTensor {
+    pub fn feed_foward(self, tensors: &Vec<RcTensor>) -> RcTensor {
         //act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
         assert_eq!(self.w.len(), tensors.len());
         zip(self.w, tensors)
-            .map(|(a, b)| a * b)
+            .map(|(a, b)| a * b.clone())
             .fold(self.b, |acc, x| acc + x)
             .tanh()
     }
@@ -81,7 +80,7 @@ mod tests {
         ];
 
         let neuron_a = Neuron::new(3);
-        let output: RcTensor = neuron_a.feed_foward(x);
+        let output: RcTensor = neuron_a.feed_foward(&x);
 
         println!("{}", output);
     }

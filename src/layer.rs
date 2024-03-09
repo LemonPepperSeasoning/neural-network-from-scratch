@@ -1,28 +1,45 @@
-use crate::tensor::Tensor;
 use crate::neuron::Neuron;
+use crate::tensor::{RcTensor, Tensor};
+use std::vec::Vec;
 
 pub struct Layer {
-    neurons: Vec<Neuron>
+    neurons: Vec<Neuron>,
 }
 
 impl Layer {
     pub fn new(nin: usize, nout: usize) -> Self {
-        println!("layer#init");
-        let neurons: Vec<Neuron> = (0..nout)
-            .map(|_| Neuon::new(nin))
-            .collect();
-        layer { neurons }
+        println!("layer#init ({}, {})", nin, nout);
+        let neurons: Vec<Neuron> = (0..nout).map(|_| Neuron::new(nin)).collect();
+        Layer { neurons }
     }
 
-    pub fn feed_foward(self, input: Vec<RcTensor>) -> Vec<RcTensor>{
+    pub fn feed_foward(&self, input: Vec<RcTensor>) -> Vec<RcTensor> {
         println!("layer#feed_foward");
-        self.neurons.iter().map(|x| x.feed_foward(input))
+        self.neurons
+            .iter()
+            .map(|neuron| <Neuron as Clone>::clone(&neuron).feed_foward(&input))
+            .collect()
+    }
+
+    pub fn parameters(&self) -> Vec<RcTensor> {
+        self.neurons
+            .iter()
+            .flat_map(|neuron| neuron.parameters())
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parameters() {
+        let layer_a = Layer::new(3, 4);
+        let params: Vec<RcTensor> = layer_a.parameters();
+
+        assert_eq!(params.len(), 12);
+    }
 
     #[test]
     fn test_feed_forward() {
@@ -35,9 +52,9 @@ mod tests {
             RcTensor::clone(&c),
         ];
 
-        let layer_a = Layer::new(3);
+        let layer_a = Layer::new(3, 4);
         let output: Vec<RcTensor> = layer_a.feed_foward(x);
 
-        assert_eq(output.len(), 3);
+        assert_eq!(output.len(), 4);
     }
 }

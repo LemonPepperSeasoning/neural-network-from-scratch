@@ -1,7 +1,8 @@
+mod layer;
+mod model;
 mod neuron;
 mod tensor;
 use crate::neuron::Neuron;
-use crate::tensor::Tensor;
 
 fn main() {
     println!("Hello, world!");
