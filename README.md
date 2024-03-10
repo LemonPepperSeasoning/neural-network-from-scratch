@@ -12,7 +12,7 @@ Simple create N layer MLP by
 mod model;
 use crate::model::Model;
 
-// this will create mlp with first layer having Input size 3, hidden layer (4, 4) and output size of 1
+// this will create mlp with first layer having Input size 3, 2 hidden layers both size of 4 and output size of 1
 let model_a = Model::new(vec![3, 4, 4, 1]);
 ```
 
