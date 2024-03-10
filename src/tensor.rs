@@ -17,8 +17,8 @@ fn get_id() -> usize {
 pub enum Ops {
     ADD,
     MUL,
-    NEG,
     TANH,
+    POW2,
     NULL,
 }
 
@@ -51,8 +51,18 @@ impl RcTensor {
         RcTensor(Rc::clone(&self.0))
     }
 
+    pub fn square(&self) -> Self {
+        RcTensor(Rc::new(RefCell::new(Tensor {
+            uid: get_id(),
+            data: self.0.borrow().data.powf(2f32),
+            grad: 0.0,
+            prev: vec![RcTensor::clone(&self)],
+            ops: Ops::POW2,
+        })))
+    }
+
     pub fn tanh(&self) -> Self {
-        println!("Tensor#tanh() on ({})", self);
+        //println!("Tensor#tanh() on ({})", self);
         RcTensor(Rc::new(RefCell::new(Tensor {
             uid: get_id(),
             data: self.0.borrow().data.tanh(),
@@ -63,7 +73,7 @@ impl RcTensor {
     }
 
     pub fn backwards(&self) {
-        println!("Tensor#backward() on {}", self);
+        //println!("Tensor#backward() on {}", self);
         // Sort in topological order
         let mut ordered_list: Vec<RcTensor> = Vec::new();
         let mut visited: HashSet<RcTensor> = HashSet::new();
@@ -80,6 +90,7 @@ impl RcTensor {
             }
         }
 
+        self.0.borrow_mut().grad = 1.0;
         // Iterate over list & for eaach, run backward()
         for rc_tensor in ordered_list {
             rc_tensor.0.borrow_mut().backward();
@@ -111,27 +122,38 @@ impl Tensor {
                 let mut tensor_2 = self.prev[1].0.borrow_mut();
                 tensor_1.grad += self.grad * tensor_2.data;
                 tensor_2.grad += self.grad * tensor_1.data;
+                // println!("{}",tensor_1.grad);ca
             }
-            Ops::NEG => println!("Should not happen"),
+            Ops::POW2 => {
+                assert_eq!(self.prev.len(), 1);
+                let mut tensor_1 = self.prev[0].0.borrow_mut();
+                tensor_1.grad += 2f32 * self.grad * tensor_1.data;
+            }
             Ops::TANH => {
                 assert_eq!(self.prev.len(), 1);
                 let mut tensor_1 = self.prev[0].0.borrow_mut();
-                tensor_1.grad += 1f32 - tensor_1.data.tanh().powf(2f32);
+                tensor_1.grad += self.grad * (1f32 - tensor_1.data.tanh().powf(2f32));
             }
-            Ops::NULL => println!("backwards do nothing"),
+            _ => (),
         }
     }
 }
 
 impl fmt::Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Tensor(data={})", self.data)
+        write!(f, "Tensor(uid={},data={})", self.uid, self.data)
     }
 }
 
 impl fmt::Display for RcTensor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "RcTensor(data={})", self.0.borrow().data)
+        write!(
+            f,
+            "RcTensor(uid={}, data={}, grad={})",
+            self.0.borrow().uid,
+            self.0.borrow().data,
+            self.0.borrow().grad
+        )
     }
 }
 
@@ -139,11 +161,11 @@ impl ops::Add for RcTensor {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        println!("Tensor#add() on ({}, {})", self, other);
+        //println!("Tensor#add() on ({}, {})", self, other);
         RcTensor(Rc::new(RefCell::new(Tensor {
             uid: get_id(),
             data: self.0.borrow().data + other.0.borrow().data,
-            grad: 0.0,
+            grad: 0f32,
             prev: vec![RcTensor::clone(&self), RcTensor::clone(&other)],
             ops: Ops::ADD,
         })))
@@ -154,7 +176,7 @@ impl ops::Mul for RcTensor {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
-        println!("Tensor#mul() on ({}, {})", self, other);
+        //println!("Tensor#mul() on ({}, {})", self, other);
         RcTensor(Rc::new(RefCell::new(Tensor {
             uid: get_id(),
             data: self.0.borrow().data * other.0.borrow().data,
@@ -165,19 +187,26 @@ impl ops::Mul for RcTensor {
     }
 }
 
+impl ops::Mul<f32> for RcTensor {
+    type Output = Self;
+
+    fn mul(self, other: f32) -> Self::Output {
+        let other_rctensor = RcTensor::new(Tensor::new(other));
+        RcTensor(Rc::new(RefCell::new(Tensor {
+            uid: get_id(),
+            data: self.0.borrow().data * other,
+            grad: 0f32,
+            prev: vec![RcTensor::clone(&self), RcTensor::clone(&other_rctensor)],
+            ops: Ops::MUL,
+        })))
+    }
+}
+
 impl ops::Neg for RcTensor {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        println!("Tensor#neg() on {}", self);
-
-        RcTensor(Rc::new(RefCell::new(Tensor {
-            uid: get_id(),
-            data: -self.0.borrow().data,
-            grad: 0f32,
-            prev: vec![RcTensor::clone(&self)],
-            ops: Ops::NEG,
-        })))
+        self * -1f32
     }
 }
 
@@ -185,7 +214,7 @@ impl ops::Sub for RcTensor {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        println!("Tensor#sub() on ({}, {})", self, other);
+        //println!("Tensor#sub() on ({}, {})", self, other);
         self + (-other)
     }
 }
@@ -219,9 +248,7 @@ mod tests {
         tensor_a.0.borrow_mut().backward();
         assert_eq!(tensor_a.0.borrow().grad, 0.0);
 
-        a_add_b.0.borrow_mut().grad = 1.0;
         a_add_b.backwards();
-
         assert_eq!(a_add_b.0.borrow().grad, 1.0);
         assert_eq!(tensor_a.0.borrow().grad, 1.0);
         assert_eq!(tensor_b.0.borrow().grad, 1.0);
@@ -251,11 +278,10 @@ mod tests {
         tensor_a.0.borrow_mut().backward();
         assert_eq!(tensor_a.0.borrow().grad, 0.0);
 
-        a_mul_b.0.borrow_mut().grad = 2.0;
         a_mul_b.backwards();
-        assert_eq!(a_mul_b.0.borrow().grad, 2.0);
-        assert_eq!(tensor_a.0.borrow().grad, 0.004);
-        assert_eq!(tensor_b.0.borrow().grad, 0.002);
+        assert_eq!(a_mul_b.0.borrow().grad, 1.0);
+        assert_eq!(tensor_a.0.borrow().grad, 0.002);
+        assert_eq!(tensor_b.0.borrow().grad, 0.001);
     }
 
     #[test]
@@ -265,13 +291,18 @@ mod tests {
 
         assert_eq!(neg_a.0.borrow().data, -0.001);
         assert_eq!(neg_a.0.borrow().grad, 0.0);
-        assert_eq!(neg_a.0.borrow().ops, Ops::NEG);
-        assert_eq!(neg_a.0.borrow().prev.len(), 1);
+        assert_eq!(neg_a.0.borrow().ops, Ops::MUL);
+        assert_eq!(neg_a.0.borrow().prev.len(), 2);
 
         assert_eq!(neg_a.0.borrow().prev[0].0.borrow().data, 0.001);
         assert_eq!(neg_a.0.borrow().prev[0].0.borrow().grad, 0.0);
         assert_eq!(neg_a.0.borrow().prev[0].0.borrow().ops, Ops::NULL);
         assert_eq!(neg_a.0.borrow().prev[0].0.borrow().prev.len(), 0);
+
+        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().data, -1.0);
+        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().grad, 0.0);
+        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().ops, Ops::NULL);
+        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().prev.len(), 0);
     }
 
     #[test]
@@ -292,8 +323,8 @@ mod tests {
 
         assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().data, -0.002);
         assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().grad, 0.0);
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().ops, Ops::NEG);
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().prev.len(), 1);
+        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().ops, Ops::MUL);
+        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().prev.len(), 2);
 
         assert_eq!(
             a_sub_b.0.borrow().prev[1].0.borrow().prev[0]
@@ -311,6 +342,32 @@ mod tests {
         );
         assert_eq!(
             a_sub_b.0.borrow().prev[1].0.borrow().prev[0]
+                .0
+                .borrow()
+                .prev
+                .len(),
+            0
+        );
+        assert_eq!(
+            a_sub_b.0.borrow().prev[1].0.borrow().prev[1].0.borrow().ops,
+            Ops::NULL
+        );
+        assert_eq!(
+            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
+                .0
+                .borrow()
+                .data,
+            -1.0
+        );
+        assert_eq!(
+            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
+                .0
+                .borrow()
+                .grad,
+            0.0
+        );
+        assert_eq!(
+            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
                 .0
                 .borrow()
                 .prev
@@ -338,9 +395,7 @@ mod tests {
 
         assert_eq!(ab_cd_e_tanh.0.borrow().data, 0.70691997);
 
-        ab_cd_e_tanh.0.borrow_mut().grad = 1.0;
         ab_cd_e_tanh.backwards();
-
         assert_eq!(a.0.borrow().grad, 1.0005283);
         assert_eq!(b.0.borrow().grad, -1.5007925);
         assert_eq!(c.0.borrow().grad, 0.50026417);

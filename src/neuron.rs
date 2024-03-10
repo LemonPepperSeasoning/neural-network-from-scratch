@@ -34,7 +34,6 @@ impl Neuron {
     }
 
     pub fn feed_foward(self, tensors: &Vec<RcTensor>) -> RcTensor {
-        //act = sum((wi*xi for wi,xi in zip(self.w, x)), self.b)
         assert_eq!(self.w.len(), tensors.len());
         zip(self.w, tensors)
             .map(|(a, b)| a * b.clone())
@@ -43,10 +42,13 @@ impl Neuron {
     }
 
     pub fn parameters(&self) -> Vec<RcTensor> {
-        self.w
-            .iter()
-            .map(|x| RcTensor::clone(x) + RcTensor::clone(&self.b))
-            .collect()
+        // self.w
+        //     .iter()
+        //     .map(|x| RcTensor::clone(x) + RcTensor::clone(&self.b))
+        //     .collect()
+        let mut new_vec = self.w.clone(); // Clone the existing vector or use clone_from_slice if possible
+        new_vec.push(RcTensor::clone(&self.b));
+        new_vec
     }
 }
 
@@ -59,13 +61,12 @@ mod tests {
         let neuron_a = Neuron::new(3);
         let params = neuron_a.parameters();
 
-        assert_eq!(params.len(), 3);
+        assert_eq!(params.len(), 4);
         assert_eq!(params[0].0.borrow().grad, 0.0);
         assert_eq!(params[1].0.borrow().grad, 0.0);
         assert_eq!(params[2].0.borrow().grad, 0.0);
-
-        println!("{}", params[0].0.borrow().prev[0]);
-        // assert_eq!(params[0].0.prev, Vec::new());
+        assert_eq!(params[3].0.borrow().data, 0.0);
+        assert_eq!(params[3].0.borrow().grad, 0.0);
     }
 
     #[test]

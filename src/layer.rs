@@ -1,5 +1,5 @@
 use crate::neuron::Neuron;
-use crate::tensor::{RcTensor, Tensor};
+use crate::tensor::RcTensor;
 use std::vec::Vec;
 
 pub struct Layer {
@@ -8,13 +8,13 @@ pub struct Layer {
 
 impl Layer {
     pub fn new(nin: usize, nout: usize) -> Self {
-        println!("layer#init ({}, {})", nin, nout);
+        //println!("layer#init ({}, {})", nin, nout);
         let neurons: Vec<Neuron> = (0..nout).map(|_| Neuron::new(nin)).collect();
         Layer { neurons }
     }
 
     pub fn feed_foward(&self, input: Vec<RcTensor>) -> Vec<RcTensor> {
-        println!("layer#feed_foward");
+        //println!("layer#feed_foward");
         self.neurons
             .iter()
             .map(|neuron| <Neuron as Clone>::clone(&neuron).feed_foward(&input))
@@ -32,13 +32,14 @@ impl Layer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tensor::Tensor;
 
     #[test]
     fn test_parameters() {
         let layer_a = Layer::new(3, 4);
         let params: Vec<RcTensor> = layer_a.parameters();
 
-        assert_eq!(params.len(), 12);
+        assert_eq!(params.len(), 16);
     }
 
     #[test]

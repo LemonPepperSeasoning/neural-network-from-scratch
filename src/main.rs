@@ -2,35 +2,66 @@ mod layer;
 mod model;
 mod neuron;
 mod tensor;
-use crate::neuron::Neuron;
+use crate::model::Model;
+use crate::tensor::{RcTensor, Tensor};
 
 fn main() {
-    println!("Hello, world!");
+    let xs: Vec<Vec<RcTensor>> = vec![
+        vec![
+            RcTensor::clone(&RcTensor::new(Tensor::new(2f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(3f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
+        ],
+        vec![
+            RcTensor::clone(&RcTensor::new(Tensor::new(3f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(0.5f32))),
+        ],
+        vec![
+            RcTensor::clone(&RcTensor::new(Tensor::new(0.5f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
+        ],
+        vec![
+            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
+            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
+        ],
+    ];
 
-    // let mut tensor_a = Tensor::new(0.001, 0.0);
-    // let mut tensor_b = Tensor::new(0.002, 0.0);
-    // let mut tensor_c = Tensor::new(0.003, 0.0);
+    let ys: Vec<Vec<RcTensor>> = vec![
+        vec![RcTensor::new(Tensor::new(1f32))],
+        vec![RcTensor::new(Tensor::new(-1f32))],
+        vec![RcTensor::new(Tensor::new(-1f32))],
+        vec![RcTensor::new(Tensor::new(1f32))],
+    ];
 
-    // tensor_a.backward();
+    let model_a = Model::new(vec![3, 4, 4, 1]);
 
-    // let tensor_d = &tensor_a + &tensor_b;
-    // println!("{} + {} = {}", tensor_a, tensor_b, tensor_d);
+    for i in 0..100 {
+        let y_preds: Vec<Vec<RcTensor>> = xs
+            .iter()
+            .map(|x: &Vec<RcTensor>| model_a.feed_foward(x.clone()))
+            .collect();
 
-    // let tensor_e = &tensor_a + &tensor_c;
-    // println!("{} + {} = {}", tensor_a, tensor_c, tensor_e);
+        let mut loss: RcTensor = RcTensor::new(Tensor::new(0f32));
+        for (row1, row2) in ys.iter().zip(y_preds.iter()) {
+            for (&ref elem1, elem2) in row1.iter().zip(row2.iter()) {
+                loss = loss + (RcTensor::clone(elem1) - RcTensor::clone(elem2)).square();
+            }
+        }
 
-    // let tensor_f = &tensor_b + &tensor_c;
-    // println!("{} + {} = {}", tensor_b, tensor_c, tensor_f);
+        for p in model_a.parameters() {
+            p.0.borrow_mut().grad = 0f32;
+        }
 
-    // let tensor_g = &tensor_a * &tensor_b;
-    // println!("{} * {} = {}", tensor_a, tensor_b, tensor_g);
+        loss.backwards();
 
-    // let tensor_h = &tensor_a * &tensor_c;
-    // println!("{} * {} = {}", tensor_a, tensor_c, tensor_h);
+        for p in model_a.parameters() {
+            let mut borrowed = p.0.borrow_mut();
+            borrowed.data -= 0.01 * borrowed.grad;
+        }
 
-    // let tensor_i = &tensor_b * &tensor_c;
-    // println!("{} * {} = {}", tensor_b, tensor_c, tensor_i);
-
-    let neuron_a = Neuron::new(3);
-    println!("{}", neuron_a);
+        println!("Iter: {}, loss: {}", i, loss.0.borrow().data);
+    }
 }

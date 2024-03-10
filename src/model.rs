@@ -1,5 +1,5 @@
 use crate::layer::Layer;
-use crate::tensor::{RcTensor, Tensor};
+use crate::tensor::RcTensor;
 
 pub struct Model {
     layers: Vec<Layer>,
@@ -7,10 +7,10 @@ pub struct Model {
 
 impl Model {
     pub fn new(shape: Vec<usize>) -> Self {
-        println!("model#init");
+        //println!("model#init");
         let layers = shape
             .windows(2)
-            .map(|window| Layer::new(window[0], window[1]))
+            .map(|window: &[usize]| Layer::new(window[0], window[1]))
             .collect();
         Model { layers }
     }
@@ -18,29 +18,32 @@ impl Model {
     pub fn parameters(&self) -> Vec<RcTensor> {
         self.layers
             .iter()
-            .flat_map(|layer| layer.parameters())
+            .flat_map(|layer: &Layer| layer.parameters())
             .collect()
     }
 
     pub fn feed_foward(&self, input: Vec<RcTensor>) -> Vec<RcTensor> {
-        println!("model#feed_foward");
+        //println!("model#feed_foward");
         self.layers
             .iter()
-            .fold(input, |x, layer| layer.feed_foward(x))
+            .fold(input, |x: Vec<RcTensor>, layer: &Layer| {
+                layer.feed_foward(x)
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tensor::Tensor;
 
     #[test]
     fn test_parameters() {
         let model_a = Model::new(vec![3, 4, 4, 1]);
         let params: Vec<RcTensor> = model_a.parameters();
 
-        // 3*4 + 4*4 + 4*1 = 12 + 16 + 4 = 32
-        assert_eq!(params.len(), 32);
+        // (3+1)*4 + (4+1)*4 + (4+1)*1 = 16 + 20 + 5 = 41
+        assert_eq!(params.len(), 41);
     }
 
     #[test]
