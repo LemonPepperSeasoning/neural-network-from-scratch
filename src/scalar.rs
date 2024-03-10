@@ -23,68 +23,68 @@ pub enum Ops {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Tensor {
+pub struct Scalar {
     pub uid: usize,
     pub data: f32,
     pub grad: f32,
-    pub prev: Vec<RcTensor>,
+    pub prev: Vec<RcScalar>,
     pub ops: Ops,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RcTensor(pub Rc<RefCell<Tensor>>);
+pub struct RcScalar(pub Rc<RefCell<Scalar>>);
 
-impl Eq for RcTensor {}
+impl Eq for RcScalar {}
 
-impl std::hash::Hash for RcTensor {
+impl std::hash::Hash for RcScalar {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.borrow().uid.hash(state);
     }
 }
 
-impl RcTensor {
-    pub fn new(tensor: Tensor) -> Self {
-        RcTensor(Rc::new(RefCell::new(tensor)))
+impl RcScalar {
+    pub fn new(scalar: Scalar) -> Self {
+        RcScalar(Rc::new(RefCell::new(scalar)))
     }
 
     pub fn clone(&self) -> Self {
-        RcTensor(Rc::clone(&self.0))
+        RcScalar(Rc::clone(&self.0))
     }
 
     pub fn square(&self) -> Self {
-        RcTensor(Rc::new(RefCell::new(Tensor {
+        RcScalar(Rc::new(RefCell::new(Scalar {
             uid: get_id(),
             data: self.0.borrow().data.powf(2f32),
             grad: 0.0,
-            prev: vec![RcTensor::clone(&self)],
+            prev: vec![RcScalar::clone(&self)],
             ops: Ops::POW2,
         })))
     }
 
     pub fn tanh(&self) -> Self {
-        //println!("Tensor#tanh() on ({})", self);
-        RcTensor(Rc::new(RefCell::new(Tensor {
+        //println!("Scalar#tanh() on ({})", self);
+        RcScalar(Rc::new(RefCell::new(Scalar {
             uid: get_id(),
             data: self.0.borrow().data.tanh(),
             grad: 0.0,
-            prev: vec![RcTensor::clone(&self)],
+            prev: vec![RcScalar::clone(&self)],
             ops: Ops::TANH,
         })))
     }
 
     pub fn backwards(&self) {
-        //println!("Tensor#backward() on {}", self);
+        //println!("Scalar#backward() on {}", self);
         // Sort in topological order
-        let mut ordered_list: Vec<RcTensor> = Vec::new();
-        let mut visited: HashSet<RcTensor> = HashSet::new();
-        let mut to_visit: Vec<RcTensor> = vec![self.clone()];
+        let mut ordered_list: Vec<RcScalar> = Vec::new();
+        let mut visited: HashSet<RcScalar> = HashSet::new();
+        let mut to_visit: Vec<RcScalar> = vec![self.clone()];
 
-        while let Some(c_tensor) = to_visit.pop() {
-            if !visited.contains(&c_tensor) {
-                ordered_list.push(c_tensor.clone());
-                visited.insert(c_tensor.clone());
+        while let Some(c_Scalar) = to_visit.pop() {
+            if !visited.contains(&c_Scalar) {
+                ordered_list.push(c_Scalar.clone());
+                visited.insert(c_Scalar.clone());
                 // Assuming bfs is a function defined elsewhere in your code
-                for child in c_tensor.0.borrow().prev.iter() {
+                for child in c_Scalar.0.borrow().prev.iter() {
                     to_visit.push(child.clone());
                 }
             }
@@ -92,15 +92,15 @@ impl RcTensor {
 
         self.0.borrow_mut().grad = 1.0;
         // Iterate over list & for eaach, run backward()
-        for rc_tensor in ordered_list {
-            rc_tensor.0.borrow_mut().backward();
+        for rc_Scalar in ordered_list {
+            rc_Scalar.0.borrow_mut().backward();
         }
     }
 }
 
-impl Tensor {
+impl Scalar {
     pub fn new(data: f32) -> Self {
-        Tensor {
+        Scalar {
             uid: get_id(),
             data: data,
             grad: 0f32,
@@ -112,44 +112,44 @@ impl Tensor {
     pub fn backward(&mut self) {
         match self.ops {
             Ops::ADD => {
-                for tensor in self.prev.iter() {
-                    tensor.0.borrow_mut().grad += self.grad
+                for Scalar in self.prev.iter() {
+                    Scalar.0.borrow_mut().grad += self.grad
                 }
             }
             Ops::MUL => {
                 assert_eq!(self.prev.len(), 2);
-                let mut tensor_1 = self.prev[0].0.borrow_mut();
-                let mut tensor_2 = self.prev[1].0.borrow_mut();
-                tensor_1.grad += self.grad * tensor_2.data;
-                tensor_2.grad += self.grad * tensor_1.data;
-                // println!("{}",tensor_1.grad);ca
+                let mut Scalar_1 = self.prev[0].0.borrow_mut();
+                let mut Scalar_2 = self.prev[1].0.borrow_mut();
+                Scalar_1.grad += self.grad * Scalar_2.data;
+                Scalar_2.grad += self.grad * Scalar_1.data;
+                // println!("{}",Scalar_1.grad);ca
             }
             Ops::POW2 => {
                 assert_eq!(self.prev.len(), 1);
-                let mut tensor_1 = self.prev[0].0.borrow_mut();
-                tensor_1.grad += 2f32 * self.grad * tensor_1.data;
+                let mut Scalar_1 = self.prev[0].0.borrow_mut();
+                Scalar_1.grad += 2f32 * self.grad * Scalar_1.data;
             }
             Ops::TANH => {
                 assert_eq!(self.prev.len(), 1);
-                let mut tensor_1 = self.prev[0].0.borrow_mut();
-                tensor_1.grad += self.grad * (1f32 - tensor_1.data.tanh().powf(2f32));
+                let mut Scalar_1 = self.prev[0].0.borrow_mut();
+                Scalar_1.grad += self.grad * (1f32 - Scalar_1.data.tanh().powf(2f32));
             }
             _ => (),
         }
     }
 }
 
-impl fmt::Display for Tensor {
+impl fmt::Display for Scalar {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Tensor(uid={},data={})", self.uid, self.data)
+        write!(f, "Scalar(uid={},data={})", self.uid, self.data)
     }
 }
 
-impl fmt::Display for RcTensor {
+impl fmt::Display for RcScalar {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "RcTensor(uid={}, data={}, grad={})",
+            "RcScalar(uid={}, data={}, grad={})",
             self.0.borrow().uid,
             self.0.borrow().data,
             self.0.borrow().grad
@@ -157,52 +157,52 @@ impl fmt::Display for RcTensor {
     }
 }
 
-impl ops::Add for RcTensor {
+impl ops::Add for RcScalar {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
-        //println!("Tensor#add() on ({}, {})", self, other);
-        RcTensor(Rc::new(RefCell::new(Tensor {
+        //println!("Scalar#add() on ({}, {})", self, other);
+        RcScalar(Rc::new(RefCell::new(Scalar {
             uid: get_id(),
             data: self.0.borrow().data + other.0.borrow().data,
             grad: 0f32,
-            prev: vec![RcTensor::clone(&self), RcTensor::clone(&other)],
+            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other)],
             ops: Ops::ADD,
         })))
     }
 }
 
-impl ops::Mul for RcTensor {
+impl ops::Mul for RcScalar {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self::Output {
-        //println!("Tensor#mul() on ({}, {})", self, other);
-        RcTensor(Rc::new(RefCell::new(Tensor {
+        //println!("Scalar#mul() on ({}, {})", self, other);
+        RcScalar(Rc::new(RefCell::new(Scalar {
             uid: get_id(),
             data: self.0.borrow().data * other.0.borrow().data,
             grad: 0f32,
-            prev: vec![RcTensor::clone(&self), RcTensor::clone(&other)],
+            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other)],
             ops: Ops::MUL,
         })))
     }
 }
 
-impl ops::Mul<f32> for RcTensor {
+impl ops::Mul<f32> for RcScalar {
     type Output = Self;
 
     fn mul(self, other: f32) -> Self::Output {
-        let other_rctensor = RcTensor::new(Tensor::new(other));
-        RcTensor(Rc::new(RefCell::new(Tensor {
+        let other_rcscalar = RcScalar::new(Scalar::new(other));
+        RcScalar(Rc::new(RefCell::new(Scalar {
             uid: get_id(),
             data: self.0.borrow().data * other,
             grad: 0f32,
-            prev: vec![RcTensor::clone(&self), RcTensor::clone(&other_rctensor)],
+            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other_rcscalar)],
             ops: Ops::MUL,
         })))
     }
 }
 
-impl ops::Neg for RcTensor {
+impl ops::Neg for RcScalar {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -210,11 +210,11 @@ impl ops::Neg for RcTensor {
     }
 }
 
-impl ops::Sub for RcTensor {
+impl ops::Sub for RcScalar {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
-        //println!("Tensor#sub() on ({}, {})", self, other);
+        //println!("Scalar#sub() on ({}, {})", self, other);
         self + (-other)
     }
 }
@@ -225,10 +225,10 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
-        let tensor_b: RcTensor = RcTensor::new(Tensor::new(0.002));
+        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
+        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
 
-        let a_add_b: RcTensor = RcTensor::clone(&tensor_a) + RcTensor::clone(&tensor_b);
+        let a_add_b: RcScalar = RcScalar::clone(&scalar_a) + RcScalar::clone(&scalar_b);
 
         assert_eq!(a_add_b.0.borrow().data, 0.003);
         assert_eq!(a_add_b.0.borrow().grad, 0.0);
@@ -245,20 +245,20 @@ mod tests {
         assert_eq!(a_add_b.0.borrow().prev[1].0.borrow().ops, Ops::NULL);
         assert_eq!(a_add_b.0.borrow().prev[1].0.borrow().prev.len(), 0);
 
-        tensor_a.0.borrow_mut().backward();
-        assert_eq!(tensor_a.0.borrow().grad, 0.0);
+        scalar_a.0.borrow_mut().backward();
+        assert_eq!(scalar_a.0.borrow().grad, 0.0);
 
         a_add_b.backwards();
         assert_eq!(a_add_b.0.borrow().grad, 1.0);
-        assert_eq!(tensor_a.0.borrow().grad, 1.0);
-        assert_eq!(tensor_b.0.borrow().grad, 1.0);
+        assert_eq!(scalar_a.0.borrow().grad, 1.0);
+        assert_eq!(scalar_b.0.borrow().grad, 1.0);
     }
 
     #[test]
     fn test_mul() {
-        let tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
-        let tensor_b: RcTensor = RcTensor::new(Tensor::new(0.002));
-        let a_mul_b: RcTensor = RcTensor::clone(&tensor_a) * RcTensor::clone(&tensor_b);
+        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
+        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
+        let a_mul_b: RcScalar = RcScalar::clone(&scalar_a) * RcScalar::clone(&scalar_b);
 
         assert_eq!(a_mul_b.0.borrow().data, 0.0000020000002);
         assert_eq!(a_mul_b.0.borrow().grad, 0.0);
@@ -275,19 +275,19 @@ mod tests {
         assert_eq!(a_mul_b.0.borrow().prev[1].0.borrow().ops, Ops::NULL);
         assert_eq!(a_mul_b.0.borrow().prev[1].0.borrow().prev.len(), 0);
 
-        tensor_a.0.borrow_mut().backward();
-        assert_eq!(tensor_a.0.borrow().grad, 0.0);
+        scalar_a.0.borrow_mut().backward();
+        assert_eq!(scalar_a.0.borrow().grad, 0.0);
 
         a_mul_b.backwards();
         assert_eq!(a_mul_b.0.borrow().grad, 1.0);
-        assert_eq!(tensor_a.0.borrow().grad, 0.002);
-        assert_eq!(tensor_b.0.borrow().grad, 0.001);
+        assert_eq!(scalar_a.0.borrow().grad, 0.002);
+        assert_eq!(scalar_b.0.borrow().grad, 0.001);
     }
 
     #[test]
     fn test_neg() {
-        let tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
-        let neg_a: RcTensor = -RcTensor::clone(&tensor_a);
+        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
+        let neg_a: RcScalar = -RcScalar::clone(&scalar_a);
 
         assert_eq!(neg_a.0.borrow().data, -0.001);
         assert_eq!(neg_a.0.borrow().grad, 0.0);
@@ -307,9 +307,9 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        let tensor_a: RcTensor = RcTensor::new(Tensor::new(0.001));
-        let tensor_b: RcTensor = RcTensor::new(Tensor::new(0.002));
-        let a_sub_b: RcTensor = RcTensor::clone(&tensor_a) - RcTensor::clone(&tensor_b);
+        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
+        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
+        let a_sub_b: RcScalar = RcScalar::clone(&scalar_a) - RcScalar::clone(&scalar_b);
 
         assert_eq!(a_sub_b.0.borrow().data, -0.001);
         assert_eq!(a_sub_b.0.borrow().grad, 0.0);
@@ -382,16 +382,16 @@ mod tests {
 
     #[test]
     fn integration() {
-        let a: RcTensor = RcTensor::new(Tensor::new(-3f32));
-        let b: RcTensor = RcTensor::new(Tensor::new(2f32));
-        let c: RcTensor = RcTensor::new(Tensor::new(0f32));
-        let d: RcTensor = RcTensor::new(Tensor::new(1f32));
-        let e: RcTensor = RcTensor::new(Tensor::new(6.881f32));
-        let ab = RcTensor::clone(&a) * RcTensor::clone(&b);
-        let cd: RcTensor = RcTensor::clone(&c) * RcTensor::clone(&d);
-        let ab_cd: RcTensor = RcTensor::clone(&ab) + RcTensor::clone(&cd);
-        let ab_cd_e: RcTensor = RcTensor::clone(&ab_cd) + RcTensor::clone(&e);
-        let ab_cd_e_tanh = RcTensor::clone(&ab_cd_e).tanh();
+        let a: RcScalar = RcScalar::new(Scalar::new(-3f32));
+        let b: RcScalar = RcScalar::new(Scalar::new(2f32));
+        let c: RcScalar = RcScalar::new(Scalar::new(0f32));
+        let d: RcScalar = RcScalar::new(Scalar::new(1f32));
+        let e: RcScalar = RcScalar::new(Scalar::new(6.881f32));
+        let ab = RcScalar::clone(&a) * RcScalar::clone(&b);
+        let cd: RcScalar = RcScalar::clone(&c) * RcScalar::clone(&d);
+        let ab_cd: RcScalar = RcScalar::clone(&ab) + RcScalar::clone(&cd);
+        let ab_cd_e: RcScalar = RcScalar::clone(&ab_cd) + RcScalar::clone(&e);
+        let ab_cd_e_tanh = RcScalar::clone(&ab_cd_e).tanh();
 
         assert_eq!(ab_cd_e_tanh.0.borrow().data, 0.70691997);
 

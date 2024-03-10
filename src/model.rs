@@ -1,5 +1,5 @@
 use crate::layer::Layer;
-use crate::tensor::RcTensor;
+use crate::scalar::RcScalar;
 
 pub struct Model {
     layers: Vec<Layer>,
@@ -15,18 +15,18 @@ impl Model {
         Model { layers }
     }
 
-    pub fn parameters(&self) -> Vec<RcTensor> {
+    pub fn parameters(&self) -> Vec<RcScalar> {
         self.layers
             .iter()
             .flat_map(|layer: &Layer| layer.parameters())
             .collect()
     }
 
-    pub fn feed_foward(&self, input: Vec<RcTensor>) -> Vec<RcTensor> {
+    pub fn feed_foward(&self, input: Vec<RcScalar>) -> Vec<RcScalar> {
         //println!("model#feed_foward");
         self.layers
             .iter()
-            .fold(input, |x: Vec<RcTensor>, layer: &Layer| {
+            .fold(input, |x: Vec<RcScalar>, layer: &Layer| {
                 layer.feed_foward(x)
             })
     }
@@ -35,12 +35,12 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tensor::Tensor;
+    use crate::scalar::Scalar;
 
     #[test]
     fn test_parameters() {
         let model_a = Model::new(vec![3, 4, 4, 1]);
-        let params: Vec<RcTensor> = model_a.parameters();
+        let params: Vec<RcScalar> = model_a.parameters();
 
         // (3+1)*4 + (4+1)*4 + (4+1)*1 = 16 + 20 + 5 = 41
         assert_eq!(params.len(), 41);
@@ -48,17 +48,17 @@ mod tests {
 
     #[test]
     fn test_feed_forward() {
-        let a: RcTensor = RcTensor::new(Tensor::new(-3f32));
-        let b: RcTensor = RcTensor::new(Tensor::new(2f32));
-        let c: RcTensor = RcTensor::new(Tensor::new(0f32));
-        let x: Vec<RcTensor> = vec![
-            RcTensor::clone(&a),
-            RcTensor::clone(&b),
-            RcTensor::clone(&c),
+        let a: RcScalar = RcScalar::new(Scalar::new(-3f32));
+        let b: RcScalar = RcScalar::new(Scalar::new(2f32));
+        let c: RcScalar = RcScalar::new(Scalar::new(0f32));
+        let x: Vec<RcScalar> = vec![
+            RcScalar::clone(&a),
+            RcScalar::clone(&b),
+            RcScalar::clone(&c),
         ];
 
         let model_a = Model::new(vec![3, 4, 4, 1]);
-        let output: Vec<RcTensor> = model_a.feed_foward(x);
+        let output: Vec<RcScalar> = model_a.feed_foward(x);
 
         assert_eq!(output.len(), 1);
     }

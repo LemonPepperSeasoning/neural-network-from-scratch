@@ -1,53 +1,53 @@
 mod layer;
 mod model;
 mod neuron;
-mod tensor;
+mod scalar;
 use crate::model::Model;
-use crate::tensor::{RcTensor, Tensor};
+use crate::scalar::{RcScalar, Scalar};
 
 fn main() {
-    let xs: Vec<Vec<RcTensor>> = vec![
+    let xs: Vec<Vec<RcScalar>> = vec![
         vec![
-            RcTensor::clone(&RcTensor::new(Tensor::new(2f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(3f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(2f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(3f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(-1f32))),
         ],
         vec![
-            RcTensor::clone(&RcTensor::new(Tensor::new(3f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(0.5f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(3f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(-1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(0.5f32))),
         ],
         vec![
-            RcTensor::clone(&RcTensor::new(Tensor::new(0.5f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(0.5f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(1f32))),
         ],
         vec![
-            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(1f32))),
-            RcTensor::clone(&RcTensor::new(Tensor::new(-1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(1f32))),
+            RcScalar::clone(&RcScalar::new(Scalar::new(-1f32))),
         ],
     ];
 
-    let ys: Vec<Vec<RcTensor>> = vec![
-        vec![RcTensor::new(Tensor::new(1f32))],
-        vec![RcTensor::new(Tensor::new(-1f32))],
-        vec![RcTensor::new(Tensor::new(-1f32))],
-        vec![RcTensor::new(Tensor::new(1f32))],
+    let ys: Vec<Vec<RcScalar>> = vec![
+        vec![RcScalar::new(Scalar::new(1f32))],
+        vec![RcScalar::new(Scalar::new(-1f32))],
+        vec![RcScalar::new(Scalar::new(-1f32))],
+        vec![RcScalar::new(Scalar::new(1f32))],
     ];
 
     let model_a = Model::new(vec![3, 4, 4, 1]);
 
     for i in 0..100 {
-        let y_preds: Vec<Vec<RcTensor>> = xs
+        let y_preds: Vec<Vec<RcScalar>> = xs
             .iter()
-            .map(|x: &Vec<RcTensor>| model_a.feed_foward(x.clone()))
+            .map(|x: &Vec<RcScalar>| model_a.feed_foward(x.clone()))
             .collect();
 
-        let mut loss: RcTensor = RcTensor::new(Tensor::new(0f32));
+        let mut loss: RcScalar = RcScalar::new(Scalar::new(0f32));
         for (row1, row2) in ys.iter().zip(y_preds.iter()) {
             for (&ref elem1, elem2) in row1.iter().zip(row2.iter()) {
-                loss = loss + (RcTensor::clone(elem1) - RcTensor::clone(elem2)).square();
+                loss = loss + (RcScalar::clone(elem1) - RcScalar::clone(elem2)).square();
             }
         }
 
