@@ -22,6 +22,9 @@ Run with:
 
 ```
 cargo run
+
+// To see log
+RUST_LOG=DEBUG cargo run
 ```
 
 Run unit test:
