@@ -4,6 +4,7 @@ use std::fmt;
 use std::iter::zip;
 use std::vec::Vec;
 
+
 #[derive(Debug, Clone)]
 pub struct Neuron {
     pub w: Vec<RcScalar>,
@@ -42,10 +43,6 @@ impl Neuron {
     }
 
     pub fn parameters(&self) -> Vec<RcScalar> {
-        // self.w
-        //     .iter()
-        //     .map(|x| RcScalar::clone(x) + RcScalar::clone(&self.b))
-        //     .collect()
         let mut new_vec = self.w.clone(); // Clone the existing vector or use clone_from_slice if possible
         new_vec.push(RcScalar::clone(&self.b));
         new_vec

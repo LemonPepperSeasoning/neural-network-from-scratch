@@ -17,7 +17,7 @@ impl Layer {
         //println!("layer#feed_foward");
         self.neurons
             .iter()
-            .map(|neuron| <Neuron as Clone>::clone(&neuron).feed_foward(&input))
+            .map(|neuron| <Neuron as Clone>::clone(neuron).feed_foward(&input))
             .collect()
     }
 

@@ -4,8 +4,12 @@ mod neuron;
 mod scalar;
 use crate::model::Model;
 use crate::scalar::{RcScalar, Scalar};
+use log::debug;
 
 fn main() {
+    env_logger::init();
+    debug!("Starting application...");
+
     let xs: Vec<Vec<RcScalar>> = vec![
         vec![
             RcScalar::clone(&RcScalar::new(Scalar::new(2f32))),
@@ -46,7 +50,7 @@ fn main() {
 
         let mut loss: RcScalar = RcScalar::new(Scalar::new(0f32));
         for (row1, row2) in ys.iter().zip(y_preds.iter()) {
-            for (&ref elem1, elem2) in row1.iter().zip(row2.iter()) {
+            for (elem1, elem2) in row1.iter().zip(row2.iter()) {
                 loss = loss + (RcScalar::clone(elem1) - RcScalar::clone(elem2)).square();
             }
         }
