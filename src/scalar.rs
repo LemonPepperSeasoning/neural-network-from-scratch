@@ -1,12 +1,10 @@
-use std::cell::RefCell;
+use log::debug;
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt;
 use std::ops;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::vec::Vec;
-use log::debug;
-
 
 static GLOBAL_COUTER: AtomicU8 = AtomicU8::new(0);
 
@@ -25,88 +23,30 @@ pub enum Ops {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Scalar {
+pub struct Scalar<'a> {
     pub uid: usize,
-    pub data: f32,
-    pub grad: f32,
-    pub prev: Vec<RcScalar>,
+    pub data: Cell<f32>,
+    pub grad: Cell<f32>,
+    pub prev: Vec<&'a Scalar<'a>>,
     pub ops: Ops,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct RcScalar(pub Rc<RefCell<Scalar>>);
-
-impl Eq for RcScalar {}
-
-impl std::hash::Hash for RcScalar {
+impl std::hash::Hash for Scalar<'_>{
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.borrow().uid.hash(state);
+        self.uid.hash(state);
     }
 }
 
-impl RcScalar {
-    pub fn new(scalar: Scalar) -> Self {
-        RcScalar(Rc::new(RefCell::new(scalar)))
-    }
+impl Eq for Scalar<'_> {}
 
-    pub fn clone(&self) -> Self {
-        RcScalar(Rc::clone(&self.0))
-    }
 
-    pub fn square(&self) -> Self {
-        debug!("Scalar#debug() on ({})", self);
-        RcScalar(Rc::new(RefCell::new(Scalar {
-            uid: get_id(),
-            data: self.0.borrow().data.powf(2f32),
-            grad: 0.0,
-            prev: vec![RcScalar::clone(self)],
-            ops: Ops::Pow2,
-        })))
-    }
 
-    pub fn tanh(&self) -> Self {
-        debug!("Scalar#Tanh() on ({})", self);
-        RcScalar(Rc::new(RefCell::new(Scalar {
-            uid: get_id(),
-            data: self.0.borrow().data.tanh(),
-            grad: 0.0,
-            prev: vec![RcScalar::clone(self)],
-            ops: Ops::Tanh,
-        })))
-    }
-
-    pub fn backwards(&self) {
-        debug!("Scalar#backward() on {}", self);
-        // Sort in topological order
-        let mut ordered_list: Vec<RcScalar> = Vec::new();
-        let mut visited: HashSet<RcScalar> = HashSet::new();
-        let mut to_visit: Vec<RcScalar> = vec![self.clone()];
-
-        while let Some(c_scalar) = to_visit.pop() {
-            if !visited.contains(&c_scalar) {
-                ordered_list.push(c_scalar.clone());
-                visited.insert(c_scalar.clone());
-                // Assuming bfs is a function defined elsewhere in your code
-                for child in c_scalar.0.borrow().prev.iter() {
-                    to_visit.push(child.clone());
-                }
-            }
-        }
-
-        self.0.borrow_mut().grad = 1.0;
-        // Iterate over list & for eaach, run backward()
-        for rc_scalar in ordered_list {
-            rc_scalar.0.borrow_mut().backward();
-        }
-    }
-}
-
-impl Scalar {
+impl Scalar<'_> {
     pub fn new(data: f32) -> Self {
         let new_scalar = Scalar {
             uid: get_id(),
-            data,
-            grad: 0f32,
+            data: Cell::new(data),
+            grad: Cell::new(0f32),
             prev: Vec::new(),
             ops: Ops::Null,
         };
@@ -114,115 +54,161 @@ impl Scalar {
         new_scalar
     }
 
-    pub fn backward(&mut self) {
+    // pub fn clone(&self) -> Self {
+    //     Scalar(Rc::clone(&self.0))
+    // }
+
+    pub fn square<'a>(&'a self) -> Scalar<'a> {
+        debug!("Scalar#debug() on ({})", self);
+        Scalar {
+            uid: get_id(),
+            data: Cell::new(self.data.get().powf(2f32)),
+            grad: Cell::new(0f32),
+            prev: vec![self],
+            ops: Ops::Pow2,
+        }
+    }
+
+    pub fn tanh<'a>(&'a self) -> Scalar<'a> {
+        debug!("Scalar#Tanh() on ({})", self);
+        Scalar {
+            uid: get_id(),
+            data: Cell::new(self.data.get().tanh()),
+            grad: Cell::new(0f32),
+            prev: vec![self],
+            ops: Ops::Tanh,
+        }
+    }
+
+    pub fn backwards(&self) {
+        debug!("Scalar#backward() on {}", self);
+        // Sort in topological order
+        let mut ordered_list: Vec<&Scalar<'_>> = Vec::new();
+        let mut visited: HashSet<&Scalar<'_>> = HashSet::new();
+        let mut to_visit: Vec<&Scalar<'_>> = vec![self];
+
+        while let Some(c_scalar) = to_visit.pop() {
+            if !visited.contains(&c_scalar) {
+                ordered_list.push(&c_scalar);
+                visited.insert(&c_scalar);
+                // Assuming bfs is a function defined elsewhere in your code
+                for child in c_scalar.prev.iter() {
+                    to_visit.push(&child);
+                }
+            }
+        }
+
+        self.grad.set(1f32);
+        // Iterate over list & for eaach, run backward()
+        for rc_scalar in ordered_list {
+            rc_scalar.backward();
+        }
+    }
+
+    pub fn backward(&self) {
         match self.ops {
             Ops::Add => {
                 for scalar in self.prev.iter() {
-                    scalar.0.borrow_mut().grad += self.grad
+                    scalar.grad.set(scalar.grad.get() + self.grad.get());
                 }
             }
             Ops::Mul => {
                 assert_eq!(self.prev.len(), 2);
-                let mut scalar_1 = self.prev[0].0.borrow_mut();
-                let mut scalar_2 = self.prev[1].0.borrow_mut();
-                scalar_1.grad += self.grad * scalar_2.data;
-                scalar_2.grad += self.grad * scalar_1.data;
+                let scalar_1 = self.prev[0];
+                let scalar_2 = self.prev[1];
+                scalar_1.grad.set(scalar_1.grad.get() + self.grad.get() * scalar_2.data.get());
+                scalar_2.grad.set(scalar_1.grad.get() + self.grad.get() * scalar_1.data.get());
                 // println!("{}",scalar_1.grad);ca
             }
             Ops::Pow2 => {
                 assert_eq!(self.prev.len(), 1);
-                let mut scalar_1 = self.prev[0].0.borrow_mut();
-                scalar_1.grad += 2f32 * self.grad * scalar_1.data;
+                let mut scalar_1 = self.prev[0];
+                scalar_1.grad.set(scalar_1.grad.get() + 2f32 * self.grad.get() * scalar_1.data.get());
             }
             Ops::Tanh => {
                 assert_eq!(self.prev.len(), 1);
-                let mut scalar_1 = self.prev[0].0.borrow_mut();
-                scalar_1.grad += self.grad * (1f32 - scalar_1.data.tanh().powf(2f32));
+                let mut scalar_1 = self.prev[0];
+                scalar_1.grad.set(scalar_1.grad.get() + self.grad.get() * (1f32 - scalar_1.data.get().tanh().powf(2f32)));
             }
             _ => (),
         }
     }
 }
 
-impl fmt::Display for Scalar {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Scalar(uid={},data={})", self.uid, self.data)
-    }
-}
-
-impl fmt::Display for RcScalar {
+impl fmt::Display for Scalar<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "RcScalar(uid={}, data={}, grad={})",
-            self.0.borrow().uid,
-            self.0.borrow().data,
-            self.0.borrow().grad
+            "Scalar(uid={},data={},grad={})",
+            self.uid,
+            self.data.get(),
+            self.grad.get()
         )
     }
 }
 
-impl ops::Add for RcScalar {
-    type Output = Self;
+impl<'a> ops::Add for &'a Scalar<'a> {
+    type Output = Scalar<'a>;
 
     fn add(self, other: Self) -> Self::Output {
         debug!("Scalar#Add() on ({}, {})", self, other);
-        RcScalar(Rc::new(RefCell::new(Scalar {
+        Scalar {
             uid: get_id(),
-            data: self.0.borrow().data + other.0.borrow().data,
-            grad: 0f32,
-            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other)],
+            data: Cell::new(self.data.get() + other.data.get()),
+            grad: Cell::new(0f32),
+            prev: vec![self, other],
             ops: Ops::Add,
-        })))
+        }
     }
 }
 
-impl ops::Mul for RcScalar {
-    type Output = Self;
+impl<'a> ops::Mul for &'a Scalar<'a> {
+    type Output = Scalar<'a>;
 
     fn mul(self, other: Self) -> Self::Output {
         debug!("Scalar#Mul() on ({}, {})", self, other);
-        RcScalar(Rc::new(RefCell::new(Scalar {
+        Scalar {
             uid: get_id(),
-            data: self.0.borrow().data * other.0.borrow().data,
-            grad: 0f32,
-            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other)],
+            data: Cell::new(self.data.get() * other.data.get()),
+            grad: Cell::new(0f32),
+            prev: vec![self, other],
             ops: Ops::Mul,
-        })))
+        }
     }
 }
 
-impl ops::Mul<f32> for RcScalar {
-    type Output = Self;
+// impl<'a> ops::Mul<f32> for &'a Scalar<'a> {
+//     type Output = Scalar<'static>;
 
-    fn mul(self, other: f32) -> Self::Output {
-        debug!("Scalar#Mul() on ({}, {})", self, other);
-        let other_rcscalar = RcScalar::new(Scalar::new(other));
-        RcScalar(Rc::new(RefCell::new(Scalar {
-            uid: get_id(),
-            data: self.0.borrow().data * other,
-            grad: 0f32,
-            prev: vec![RcScalar::clone(&self), RcScalar::clone(&other_rcscalar)],
-            ops: Ops::Mul,
-        })))
-    }
-}
+//     fn mul(self, other: f32) -> Self::Output {
+//         debug!("Scalar#Mul() on ({}, {})", self, other);
+//         let other_scalar: Scalar<'a> = Scalar::new(other);
+//         Scalar {
+//             uid: get_id(),
+//             data: Cell::new(self.data.get() * other),
+//             grad: Cell::new(0f32),
+//             prev: vec![self, &other_scalar],
+//             ops: Ops::Mul,
+//         }
+//     }
+// }
 
-impl ops::Neg for RcScalar {
-    type Output = Self;
+// impl<'a> ops::Neg for &'a Scalar<'a> {
+//     type Output = Scalar<'a>;
 
-    fn neg(self) -> Self::Output {
-        debug!("Scalar#neg() on ({})", self);
-        self * -1f32
-    }
-}
+//     fn neg(self) -> Self::Output {
+//         debug!("Scalar#neg() on ({})", self);
+//         self * -1f32
+//     }
+// }
 
-impl ops::Sub for RcScalar {
-    type Output = Self;
+impl<'a> ops::Sub for &'a Scalar<'a> {
+    type Output = Scalar<'a>;
 
     fn sub(self, other: Self) -> Self::Output {
         debug!("Scalar#sub() on ({}, {})", self, other);
-        self + (-other)
+        other.data.set(other.data.get() * -1f32);
+        self + other
     }
 }
 
@@ -232,181 +218,137 @@ mod tests {
 
     #[test]
     fn test_Add() {
-        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
-        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
+        let scalar_a = Scalar::new(0.001);
+        let scalar_b = Scalar::new(0.002);
 
-        let a_Add_b: RcScalar = RcScalar::clone(&scalar_a) + RcScalar::clone(&scalar_b);
+        let a_add_b = &scalar_a + &scalar_b;
 
-        assert_eq!(a_Add_b.0.borrow().data, 0.003);
-        assert_eq!(a_Add_b.0.borrow().grad, 0.0);
-        assert_eq!(a_Add_b.0.borrow().ops, Ops::Add);
-        assert_eq!(a_Add_b.0.borrow().prev.len(), 2);
+        assert_eq!(a_add_b.data.get(), 0.003);
+        assert_eq!(a_add_b.grad.get(), 0.0);
+        assert_eq!(a_add_b.ops, Ops::Add);
+        assert_eq!(a_add_b.prev.len(), 2);
 
-        assert_eq!(a_Add_b.0.borrow().prev[0].0.borrow().data, 0.001);
-        assert_eq!(a_Add_b.0.borrow().prev[0].0.borrow().grad, 0.0);
-        assert_eq!(a_Add_b.0.borrow().prev[0].0.borrow().ops, Ops::Null);
-        assert_eq!(a_Add_b.0.borrow().prev[0].0.borrow().prev.len(), 0);
+        assert_eq!(a_add_b.prev[0].data.get(), 0.001);
+        assert_eq!(a_add_b.prev[0].grad.get(), 0.0);
+        assert_eq!(a_add_b.prev[0].ops, Ops::Null);
+        assert_eq!(a_add_b.prev[0].prev.len(), 0);
 
-        assert_eq!(a_Add_b.0.borrow().prev[1].0.borrow().data, 0.002);
-        assert_eq!(a_Add_b.0.borrow().prev[1].0.borrow().grad, 0.0);
-        assert_eq!(a_Add_b.0.borrow().prev[1].0.borrow().ops, Ops::Null);
-        assert_eq!(a_Add_b.0.borrow().prev[1].0.borrow().prev.len(), 0);
+        assert_eq!(a_add_b.prev[1].data.get(), 0.002);
+        assert_eq!(a_add_b.prev[1].grad.get(), 0.0);
+        assert_eq!(a_add_b.prev[1].ops, Ops::Null);
+        assert_eq!(a_add_b.prev[1].prev.len(), 0);
 
-        scalar_a.0.borrow_mut().backward();
-        assert_eq!(scalar_a.0.borrow().grad, 0.0);
+        scalar_a.backward();
+        assert_eq!(scalar_a.grad.get(), 0.0);
 
-        a_Add_b.backwards();
-        assert_eq!(a_Add_b.0.borrow().grad, 1.0);
-        assert_eq!(scalar_a.0.borrow().grad, 1.0);
-        assert_eq!(scalar_b.0.borrow().grad, 1.0);
+        a_add_b.backwards();
+        assert_eq!(a_add_b.grad.get(), 1.0);
+        assert_eq!(scalar_a.grad.get(), 1.0);
+        assert_eq!(scalar_b.grad.get(), 1.0);
     }
 
     #[test]
     fn test_Mul() {
-        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
-        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
-        let a_Mul_b: RcScalar = RcScalar::clone(&scalar_a) * RcScalar::clone(&scalar_b);
+        let scalar_a = Scalar::new(0.001);
+        let scalar_b = Scalar::new(0.002);
+        let a_mul_b = &scalar_a * &scalar_b;
 
-        assert_eq!(a_Mul_b.0.borrow().data, 0.0000020000002);
-        assert_eq!(a_Mul_b.0.borrow().grad, 0.0);
-        assert_eq!(a_Mul_b.0.borrow().ops, Ops::Mul);
-        assert_eq!(a_Mul_b.0.borrow().prev.len(), 2);
+        assert_eq!(a_mul_b.data.get(), 0.0000020000002);
+        assert_eq!(a_mul_b.grad.get(), 0.0);
+        assert_eq!(a_mul_b.ops, Ops::Mul);
+        assert_eq!(a_mul_b.prev.len(), 2);
 
-        assert_eq!(a_Mul_b.0.borrow().prev[0].0.borrow().data, 0.001);
-        assert_eq!(a_Mul_b.0.borrow().prev[0].0.borrow().grad, 0.0);
-        assert_eq!(a_Mul_b.0.borrow().prev[0].0.borrow().ops, Ops::Null);
-        assert_eq!(a_Mul_b.0.borrow().prev[0].0.borrow().prev.len(), 0);
+        assert_eq!(a_mul_b.prev[0].data.get(), 0.001);
+        assert_eq!(a_mul_b.prev[0].grad.get(), 0.0);
+        assert_eq!(a_mul_b.prev[0].ops, Ops::Null);
+        assert_eq!(a_mul_b.prev[0].prev.len(), 0);
 
-        assert_eq!(a_Mul_b.0.borrow().prev[1].0.borrow().data, 0.002);
-        assert_eq!(a_Mul_b.0.borrow().prev[1].0.borrow().grad, 0.0);
-        assert_eq!(a_Mul_b.0.borrow().prev[1].0.borrow().ops, Ops::Null);
-        assert_eq!(a_Mul_b.0.borrow().prev[1].0.borrow().prev.len(), 0);
+        assert_eq!(a_mul_b.prev[1].data.get(), 0.002);
+        assert_eq!(a_mul_b.prev[1].grad.get(), 0.0);
+        assert_eq!(a_mul_b.prev[1].ops, Ops::Null);
+        assert_eq!(a_mul_b.prev[1].prev.len(), 0);
 
-        scalar_a.0.borrow_mut().backward();
-        assert_eq!(scalar_a.0.borrow().grad, 0.0);
+        scalar_a.backward();
+        assert_eq!(scalar_a.grad.get(), 0.0);
 
-        a_Mul_b.backwards();
-        assert_eq!(a_Mul_b.0.borrow().grad, 1.0);
-        assert_eq!(scalar_a.0.borrow().grad, 0.002);
-        assert_eq!(scalar_b.0.borrow().grad, 0.001);
+        a_mul_b.backwards();
+        assert_eq!(a_mul_b.grad.get(), 1.0);
+        assert_eq!(scalar_a.grad.get(), 0.002);
+        assert_eq!(scalar_b.grad.get(), 0.001);
     }
 
-    #[test]
-    fn test_neg() {
-        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
-        let neg_a: RcScalar = -RcScalar::clone(&scalar_a);
+    // #[test]
+    // fn test_neg() {
+    //     let scalar_a = Scalar::new(0.001);
+    //     let neg_a = -&scalar_a;
 
-        assert_eq!(neg_a.0.borrow().data, -0.001);
-        assert_eq!(neg_a.0.borrow().grad, 0.0);
-        assert_eq!(neg_a.0.borrow().ops, Ops::Mul);
-        assert_eq!(neg_a.0.borrow().prev.len(), 2);
+    //     assert_eq!(neg_a.data.get(), -0.001);
+    //     assert_eq!(neg_a.grad.get(), 0.0);
+    //     assert_eq!(neg_a.ops, Ops::Mul);
+    //     assert_eq!(neg_a.prev.len(), 2);
 
-        assert_eq!(neg_a.0.borrow().prev[0].0.borrow().data, 0.001);
-        assert_eq!(neg_a.0.borrow().prev[0].0.borrow().grad, 0.0);
-        assert_eq!(neg_a.0.borrow().prev[0].0.borrow().ops, Ops::Null);
-        assert_eq!(neg_a.0.borrow().prev[0].0.borrow().prev.len(), 0);
+    //     assert_eq!(neg_a.prev[0].data.get(), 0.001);
+    //     assert_eq!(neg_a.prev[0].grad.get(), 0.0);
+    //     assert_eq!(neg_a.prev[0].ops, Ops::Null);
+    //     assert_eq!(neg_a.prev[0].prev.len(), 0);
 
-        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().data, -1.0);
-        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().grad, 0.0);
-        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().ops, Ops::Null);
-        assert_eq!(neg_a.0.borrow().prev[1].0.borrow().prev.len(), 0);
-    }
+    //     assert_eq!(neg_a.prev[1].data.get(), -1.0);
+    //     assert_eq!(neg_a.prev[1].grad.get(), 0.0);
+    //     assert_eq!(neg_a.prev[1].ops, Ops::Null);
+    //     assert_eq!(neg_a.prev[1].prev.len(), 0);
+    // }
 
     #[test]
     fn test_sub() {
-        let scalar_a: RcScalar = RcScalar::new(Scalar::new(0.001));
-        let scalar_b: RcScalar = RcScalar::new(Scalar::new(0.002));
-        let a_sub_b: RcScalar = RcScalar::clone(&scalar_a) - RcScalar::clone(&scalar_b);
+        let scalar_a = Scalar::new(0.001);
+        let scalar_b = Scalar::new(0.002);
+        let a_sub_b = &scalar_a - &scalar_b;
 
-        assert_eq!(a_sub_b.0.borrow().data, -0.001);
-        assert_eq!(a_sub_b.0.borrow().grad, 0.0);
-        assert_eq!(a_sub_b.0.borrow().ops, Ops::Add);
+        assert_eq!(a_sub_b.data.get(), -0.001);
+        assert_eq!(a_sub_b.grad.get(), 0.0);
+        assert_eq!(a_sub_b.ops, Ops::Add);
 
-        assert_eq!(a_sub_b.0.borrow().prev.len(), 2);
-        assert_eq!(a_sub_b.0.borrow().prev[0].0.borrow().data, 0.001);
-        assert_eq!(a_sub_b.0.borrow().prev[0].0.borrow().grad, 0.0);
-        assert_eq!(a_sub_b.0.borrow().prev[0].0.borrow().ops, Ops::Null);
-        assert_eq!(a_sub_b.0.borrow().prev[0].0.borrow().prev.len(), 0);
+        assert_eq!(a_sub_b.prev.len(), 2);
+        assert_eq!(a_sub_b.prev[0].data.get(), 0.001);
+        assert_eq!(a_sub_b.prev[0].grad.get(), 0.0);
+        assert_eq!(a_sub_b.prev[0].ops, Ops::Null);
+        assert_eq!(a_sub_b.prev[0].prev.len(), 0);
 
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().data, -0.002);
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().grad, 0.0);
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().ops, Ops::Mul);
-        assert_eq!(a_sub_b.0.borrow().prev[1].0.borrow().prev.len(), 2);
+        assert_eq!(a_sub_b.prev[1].data.get(), -0.002);
+        assert_eq!(a_sub_b.prev[1].grad.get(), 0.0);
+        assert_eq!(a_sub_b.prev[1].ops, Ops::Mul);
+        assert_eq!(a_sub_b.prev[1].prev.len(), 2);
 
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[0]
-                .0
-                .borrow()
-                .data,
-            0.002
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[0]
-                .0
-                .borrow()
-                .grad,
-            0.0
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[0]
-                .0
-                .borrow()
-                .prev
-                .len(),
-            0
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[1].0.borrow().ops,
-            Ops::Null
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
-                .0
-                .borrow()
-                .data,
-            -1.0
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
-                .0
-                .borrow()
-                .grad,
-            0.0
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[1]
-                .0
-                .borrow()
-                .prev
-                .len(),
-            0
-        );
-        assert_eq!(
-            a_sub_b.0.borrow().prev[1].0.borrow().prev[0].0.borrow().ops,
-            Ops::Null
-        );
+        assert_eq!(a_sub_b.prev[1].prev[0].data.get(), 0.002);
+        assert_eq!(a_sub_b.prev[1].prev[0].grad.get(), 0.0);
+        assert_eq!(a_sub_b.prev[1].prev[0].prev.len(), 0);
+        assert_eq!(a_sub_b.prev[1].prev[1].ops, Ops::Null);
+        assert_eq!(a_sub_b.prev[1].prev[1].data.get(), -1.0);
+        assert_eq!(a_sub_b.prev[1].prev[1].grad.get(), 0.0);
+        assert_eq!(a_sub_b.prev[1].prev[1].prev.len(), 0);
+        assert_eq!(a_sub_b.prev[1].prev[0].ops, Ops::Null);
     }
 
     #[test]
     fn integration() {
-        let a: RcScalar = RcScalar::new(Scalar::new(-3f32));
-        let b: RcScalar = RcScalar::new(Scalar::new(2f32));
-        let c: RcScalar = RcScalar::new(Scalar::new(0f32));
-        let d: RcScalar = RcScalar::new(Scalar::new(1f32));
-        let e: RcScalar = RcScalar::new(Scalar::new(6.881f32));
-        let ab = RcScalar::clone(&a) * RcScalar::clone(&b);
-        let cd: RcScalar = RcScalar::clone(&c) * RcScalar::clone(&d);
-        let ab_cd: RcScalar = RcScalar::clone(&ab) + RcScalar::clone(&cd);
-        let ab_cd_e: RcScalar = RcScalar::clone(&ab_cd) + RcScalar::clone(&e);
-        let ab_cd_e_Tanh = RcScalar::clone(&ab_cd_e).Tanh();
+        let a = Scalar::new(-3f32);
+        let b = Scalar::new(2f32);
+        let c = Scalar::new(0f32);
+        let d = Scalar::new(1f32);
+        let e = Scalar::new(6.881f32);
+        let ab = &a * &b;
+        let cd = &c * &d;
+        let ab_cd = &ab + &cd;
+        let ab_cd_e = &ab_cd + &e;
+        let ab_cd_e_tanh = ab_cd_e.tanh();
 
-        assert_eq!(ab_cd_e_Tanh.0.borrow().data, 0.70691997);
+        assert_eq!(ab_cd_e_tanh.data.get(), 0.70691997);
 
-        ab_cd_e_Tanh.backwards();
-        assert_eq!(a.0.borrow().grad, 1.0005283);
-        assert_eq!(b.0.borrow().grad, -1.5007925);
-        assert_eq!(c.0.borrow().grad, 0.50026417);
-        assert_eq!(d.0.borrow().grad, 0.0);
-        assert_eq!(e.0.borrow().grad, 0.50026417);
+        ab_cd_e_tanh.backwards();
+        assert_eq!(a.grad.get(), 1.0005283);
+        assert_eq!(b.grad.get(), -1.5007925);
+        assert_eq!(c.grad.get(), 0.50026417);
+        assert_eq!(d.grad.get(), 0.0);
+        assert_eq!(e.grad.get(), 0.50026417);
     }
 }

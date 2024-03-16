@@ -1,19 +1,19 @@
 use crate::neuron::Neuron;
-use crate::scalar::RcScalar;
+use crate::scalar::Scalar;
 use std::vec::Vec;
 
-pub struct Layer {
-    neurons: Vec<Neuron>,
+pub struct Layer<'a> {
+    neurons: Vec<&'a Neuron<'a>>,
 }
 
-impl Layer {
+impl Layer<'_> {
     pub fn new(nin: usize, nout: usize) -> Self {
         //println!("layer#init ({}, {})", nin, nout);
-        let neurons: Vec<Neuron> = (0..nout).map(|_| Neuron::new(nin)).collect();
+        let neurons: Vec<&Neuron> = (0..nout).map(|_| &Neuron::new(nin)).collect();
         Layer { neurons }
     }
 
-    pub fn feed_foward(&self, input: Vec<RcScalar>) -> Vec<RcScalar> {
+    pub fn feed_foward(&self, input: Vec<Scalar>) -> Vec<Scalar> {
         //println!("layer#feed_foward");
         self.neurons
             .iter()
@@ -21,7 +21,7 @@ impl Layer {
             .collect()
     }
 
-    pub fn parameters(&self) -> Vec<RcScalar> {
+    pub fn parameters(&self) -> Vec<&Scalar> {
         self.neurons
             .iter()
             .flat_map(|neuron| neuron.parameters())
@@ -37,24 +37,24 @@ mod tests {
     #[test]
     fn test_parameters() {
         let layer_a = Layer::new(3, 4);
-        let params: Vec<RcScalar> = layer_a.parameters();
+        let params: Vec<&Scalar> = layer_a.parameters();
 
         assert_eq!(params.len(), 16);
     }
 
     #[test]
     fn test_feed_forward() {
-        let a: RcScalar = RcScalar::new(Scalar::new(-3f32));
-        let b: RcScalar = RcScalar::new(Scalar::new(2f32));
-        let c: RcScalar = RcScalar::new(Scalar::new(0f32));
-        let x: Vec<RcScalar> = vec![
-            RcScalar::clone(&a),
-            RcScalar::clone(&b),
-            RcScalar::clone(&c),
+        let a = Scalar::new(-3f32);
+        let b = Scalar::new(2f32);
+        let c = Scalar::new(0f32);
+        let x: Vec<Scalar> = vec![
+            a,
+            b,
+            c,
         ];
 
         let layer_a = Layer::new(3, 4);
-        let output: Vec<RcScalar> = layer_a.feed_foward(x);
+        let output: Vec<Scalar> = layer_a.feed_foward(x);
 
         assert_eq!(output.len(), 4);
     }
