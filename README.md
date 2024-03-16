@@ -28,6 +28,9 @@ Run unit test:
 
 ```
 cargo test
+
+// to show stdout
+cargo test -- --nocapture
 ```
 
 Auto format:

@@ -10,8 +10,8 @@ fn main() {
     let b = Scalar::new(2f32);
     let x = Scalar::new(3f32);
     let y = Scalar::new(4f32);
-    let mut c = a + b;
-    let mut d = a + b;
+    let mut c = &a + &b;
+    let mut d = &a + &b;
 
 
 

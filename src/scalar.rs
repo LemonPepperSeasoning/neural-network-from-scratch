@@ -1,8 +1,9 @@
 use std::fmt;
-use std::fmt::Pointer;
 use std::ops;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::vec::Vec;
+use std::cell::Cell;
+
 
 static GLOBAL_COUTER: AtomicU8 = AtomicU8::new(0);
 
@@ -13,173 +14,101 @@ fn get_id() -> usize {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ops {
-    ADD,
-    MUL,
-    TANH,
-    POW2,
-    NULL,
+    Add,
+    Mul,
+    Tanh,
+    Square,
+    Null
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum ScalarPointer {
-    Pointer(Box<Scalar>),
-    Nil,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Scalar {
+pub struct Scalar<'a>  {
     pub uid: usize,
-    pub data: f32,
-    pub grad: f32,
-    pub prev1: ScalarPointer,
-    pub prev2: ScalarPointer,
+    pub data: Cell<f32>,
+    pub grad: Cell<f32>,
+    pub prev: Vec<&'a Scalar<'a>>,
     pub ops: Ops,
 }
 
 
-impl Scalar {
+impl Scalar<'_> {
     pub fn new(data: f32) -> Self {
         Scalar {
             uid: get_id(),
-            data: data,
-            grad: 0f32,
-            prev1: ScalarPointer::Nil,
-            prev2: ScalarPointer::Nil,
-            ops: Ops::NULL,
+            data: Cell::new(data),
+            grad: Cell::new(0f32),
+            prev: Vec::new(),
+            ops: Ops::Null,
         }
     }
 
-    pub fn get_data(&self) -> f32{
-        self.data
-    }
-
-    pub fn get_grad(&self) -> f32{
-        self.grad
-    }
-
-    pub fn add_grad(&mut self, grad:f32) {
-        self.grad += grad;
-    }
-
-    pub fn backwards(&mut self) {
-        self.grad = 1f32;
+    pub fn backwards(&self) {
+        self.grad.set(1f32);
         self.backward();
     }
 
-    fn backward(&mut self) {
+    fn backward(&self) {
         match self.ops {
-            Ops::ADD => {
-                match self.prev1 {
-                    ScalarPointer::Pointer(ref mut scalar) => {
-                        // scalar.add_grad(self.grad);
-                        scalar.grad += self.grad;
-                    },
-                    ScalarPointer::Nil => {}
+            Ops::Add => {
+                for scalar in self.prev.iter() {
+                    scalar.grad.set(scalar.grad.get() + self.grad.get())
                 }
-                // for scalar in self.prev.iter() {
-                //     // scalar.grad += self.grad
-                //     scalar.add_grad(self.grad)
-                // }
             }
-            Ops::MUL => {
-                // assert_eq!(self.prev.len(), 2);
-                // let mut scalar_1 = self.prev1;
-                // let mut scalar_2 = self.prev2;
-                // let mut scalar_1 = self.prev[0];
-                // let mut scalar_2 = self.prev[1];
-                // Scalar_1.grad += self.grad * Scalar_2.data;
-                // Scalar_2.grad += self.grad * Scalar_1.data;
-                match self.prev1 {
-                    ScalarPointer::Pointer(ref mut scalar) => {
-                        scalar.add_grad(self.grad * 2f32);
-                    },
-                    ScalarPointer::Nil => {}
-                }
-
-                // scalar_1.add_grad(self.grad * scalar_2.get_data());
-
-                // println!("{}",Scalar_1.grad);ca
+            Ops::Mul => {
+                assert_eq!(self.prev.len(), 2);
+                let scalar_1 = self.prev[0];
+                let scalar_2 = self.prev[1];
+                scalar_1.grad.set(self.grad.get() + scalar_2.data.get());
+                scalar_2.grad.set(self.grad.get() + scalar_1.data.get());
             }
-            // Ops::POW2 => {
-            //     assert_eq!(self.prev.len(), 1);
-            //     let mut Scalar_1 = self.prev[0];
-            //     Scalar_1.grad += 2f32 * self.grad * Scalar_1.data;
-            // }
-            // Ops::TANH => {
-            //     assert_eq!(self.prev.len(), 1);
-            //     let mut Scalar_1 = self.prev[0];
-            //     Scalar_1.grad += self.grad * (1f32 - Scalar_1.data.tanh().powf(2f32));
-            // }
+            Ops::Square => {
+                assert_eq!(self.prev.len(), 1);
+                let scalar_1 = self.prev[0];
+                scalar_1.grad.set(2f32 * self.grad.get() * scalar_1.data.get());
+            }
+            Ops::Tanh => {
+                assert_eq!(self.prev.len(), 1);
+                let scalar_1 = self.prev[0];
+                scalar_1.grad.set(self.grad.get() + (1f32 - scalar_1.data.get().tanh().powf(2f32)));
+            }
             _ => (),
         }
     }
 }
 
-impl fmt::Display for Scalar {
+impl fmt::Display for Scalar<'_>  {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Scalar(uid={},data={},grad={})", self.uid, self.data, self.grad)
+        write!(f, "Scalar(uid={},data={},grad={})", self.uid, self.data.get(), self.grad.get())
     }
 }
 
-impl ops::Add for &Scalar {
-    type Output = Scalar ;
+impl<'a> ops::Add for &'a Scalar<'a> {
+    type Output = Scalar<'a>;
 
-    fn add(self, other: &Scalar) -> Self::Output {
+    fn add(self, other: Self) -> Self::Output {
         Scalar {
             uid: get_id(),
-            data: self.data + other.data,
-            grad: 0f32,
-            prev1: ScalarPointer::Pointer(Box::new(*self)),
-            prev2: ScalarPointer::Pointer(Box::new(*other)),
-            ops: Ops::NULL,
+            data: Cell::new(self.data.get() + other.data.get()),
+            grad: Cell::new(0f32),
+            prev: vec![self, other],
+            ops: Ops::Add,
         }
     }
 }
 
-// impl ops::Add for Scalar<'_> {
-//     type Output = Self;
+impl<'a> ops::Mul for &'a Scalar<'a> {
+    type Output = Scalar<'a>;
 
-//     fn add(self, other: Self) -> Self::Output {
-//         Scalar {
-//             uid: get_id(),
-//             data: self.data + other.data,
-//             grad: 0f32,
-//             prev: vec![self, other],
-//             ops: Ops::ADD,
-//         }
-//     }
-// }
-
-// impl ops::Mul for Scalar<'_> {
-//     type Output = Self;
-
-//     fn mul(self, other: Self) -> Self::Output {
-//         Scalar {
-//             uid: get_id(),
-//             data: self.data * other.data,
-//             grad: 0f32,
-//             prev: vec![self, other],
-//             ops: Ops::MUL,
-//         }
-//     }
-// }
-
-// impl ops::Mul<f32> for Scalar<'_> {
-//     type Output = Self;
-
-//     fn mul(self, other: f32) -> Self::Output {
-//         let other = Scalar::new(other);
-//         Scalar {
-//             uid: get_id(),
-//             data: self.data + other.data,
-//             grad: 0f32,
-//             prev: vec![self, other],
-//             ops: Ops::MUL,
-//         }
-//     }
-// }
-
-
+    fn mul(self, other: Self) -> Self::Output {
+        Scalar {
+            uid: get_id(),
+            data: Cell::new(self.data.get() * other.data.get()),
+            grad: Cell::new(0f32),
+            prev: vec![self, other],
+            ops: Ops::Mul,
+        }
+    }
+}
 
 
 #[cfg(test)]
@@ -190,21 +119,25 @@ mod tests {
     fn test_add() {
         let a = Scalar::new(1f32);
         let b = Scalar::new(2f32);
-        let mut c = a + b;
+        let c = &a + &b;
         println!("{}", c);
         c.backwards();
+        println!("{}", a);
+        println!("{}", b);
         println!("{}", c);
     }
 
-    // #[test]
-    // fn test_mul() {
-    //     let a = Scalar::new(1f32);
-    //     let b = Scalar::new(2f32);
-    //     let c = a * b;
-    //     println!("{}", c);
-    //     println!("{}", c.prev[0]);
-    //     println!("{}", c.prev[1]);
-    // }
+    #[test]
+    fn test_mul() {
+        let a = Scalar::new(1f32);
+        let b = Scalar::new(2f32);
+        let c = &a * &b;
+        println!("{}", c);
+        c.backwards();
+        println!("{}", a);
+        println!("{}", b);
+        println!("{}", c);
+    }
 
     // #[test]
     // fn test_mul_float() {
