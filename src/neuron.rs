@@ -1,4 +1,4 @@
-use crate::scalar::Scalar;
+use crate::scalar::{self, Scalar};
 use rand::Rng;
 use std::fmt;
 use std::iter::zip;
@@ -6,8 +6,8 @@ use std::vec::Vec;
 
 #[derive(Debug, Clone)]
 pub struct Neuron<'a> {
-    pub w: Vec<&'a Scalar<'a>>,
-    pub b: &'a Scalar<'a>,
+    pub w: Vec<Scalar<'a>>,
+    pub b: Scalar<'a>,
 }
 
 impl fmt::Display for Neuron<'_> {
@@ -26,23 +26,24 @@ impl fmt::Display for Neuron<'_> {
 impl Neuron<'_> {
     pub fn new(nin: usize) -> Self {
         let mut rng = rand::thread_rng();
-        let w: Vec<&Scalar> = (0..nin)
-            .map(|_| &Scalar::new(rng.gen_range(-1.0..1.0)))
+        let w: Vec<Scalar> = (0..nin)
+            .map(|_| Scalar::new(rng.gen_range(-1.0..1.0)))
             .collect();
-        let ref b = Scalar::new(0.0);
+        let b: Scalar<'_> = Scalar::new(0.0);
         Self { w, b }
     }
 
+    // pub fn feed_foward(&self, scalars: &Vec<Scalar>) -> Scalar {
     pub fn feed_foward<'a>(&'a self, scalars: &'a Vec<Scalar>) -> Scalar<'a> {
         assert_eq!(self.w.len(), scalars.len());
-        zip(self.w.iter(), scalars)
-            .map(|(a, b)| *a * b)
-            .fold(self.b, |acc, x| &(acc + &x))
+        zip(self.w.iter(), scalars.iter())
+            .map(|(a, b)| a * b)
+            .fold(self.b, |acc, x| &acc + &x)
             .tanh()
     }
 
-    pub fn parameters(&self) -> Vec<&Scalar> {
-        let mut new_vec = self.w.clone(); // Clone the existing vector or use clone_from_slice if possible
+    pub fn parameters(&self) -> Vec<Scalar<'_>> {
+        let mut new_vec: Vec<Scalar<'_>> = self.w.clone(); // Clone the existing vector or use clone_from_slice if possible
         new_vec.push(self.b);
         new_vec
     }

@@ -3,13 +3,13 @@ use crate::scalar::Scalar;
 use std::vec::Vec;
 
 pub struct Layer<'a> {
-    neurons: Vec<&'a Neuron<'a>>,
+    neurons: Vec<Neuron<'a>>,
 }
 
 impl Layer<'_> {
     pub fn new(nin: usize, nout: usize) -> Self {
         //println!("layer#init ({}, {})", nin, nout);
-        let neurons: Vec<&Neuron> = (0..nout).map(|_| &Neuron::new(nin)).collect();
+        let neurons: Vec<Neuron> = (0..nout).map(|_| Neuron::new(nin)).collect();
         Layer { neurons }
     }
 
@@ -21,7 +21,7 @@ impl Layer<'_> {
             .collect()
     }
 
-    pub fn parameters(&self) -> Vec<&Scalar> {
+    pub fn parameters(&self) -> Vec<Scalar> {
         self.neurons
             .iter()
             .flat_map(|neuron| neuron.parameters())
@@ -37,7 +37,7 @@ mod tests {
     #[test]
     fn test_parameters() {
         let layer_a = Layer::new(3, 4);
-        let params: Vec<&Scalar> = layer_a.parameters();
+        let params: Vec<Scalar> = layer_a.parameters();
 
         assert_eq!(params.len(), 16);
     }

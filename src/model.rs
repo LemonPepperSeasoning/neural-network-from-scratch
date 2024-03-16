@@ -2,7 +2,7 @@ use crate::layer::Layer;
 use crate::scalar::Scalar;
 
 pub struct Model<'a> {
-    layers: Vec<&'a Layer<'a>>,
+    layers: Vec<Layer<'a>>,
 }
 
 impl Model<'_> {
@@ -10,7 +10,7 @@ impl Model<'_> {
         //println!("model#init");
         let layers = shape
             .windows(2)
-            .map(|window: &[usize]| &Layer::new(window[0], window[1]))
+            .map(|window: &[usize]| Layer::new(window[0], window[1]))
             .collect();
         Model { layers }
     }
@@ -24,7 +24,7 @@ impl Model<'_> {
             })
     }
 
-    pub fn parameters(&self) -> Vec<&Scalar> {
+    pub fn parameters(&self) -> Vec<Scalar> {
         self.layers
             .iter()
             .flat_map(|layer| layer.parameters())
@@ -52,9 +52,9 @@ mod tests {
         let b = Scalar::new(2f32);
         let c = Scalar::new(0f32);
         let x: Vec<Scalar> = vec![
-            &a,
-            &b,
-            &c,
+            a,
+            b,
+            c,
         ];
 
         let model_a = Model::new(vec![3, 4, 4, 1]);

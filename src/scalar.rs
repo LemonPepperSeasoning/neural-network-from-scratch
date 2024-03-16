@@ -54,10 +54,6 @@ impl Scalar<'_> {
         new_scalar
     }
 
-    // pub fn clone(&self) -> Self {
-    //     Scalar(Rc::clone(&self.0))
-    // }
-
     pub fn square<'a>(&'a self) -> Scalar<'a> {
         debug!("Scalar#debug() on ({})", self);
         Scalar {
@@ -122,12 +118,12 @@ impl Scalar<'_> {
             }
             Ops::Pow2 => {
                 assert_eq!(self.prev.len(), 1);
-                let mut scalar_1 = self.prev[0];
+                let scalar_1 = self.prev[0];
                 scalar_1.grad.set(scalar_1.grad.get() + 2f32 * self.grad.get() * scalar_1.data.get());
             }
             Ops::Tanh => {
                 assert_eq!(self.prev.len(), 1);
-                let mut scalar_1 = self.prev[0];
+                let scalar_1 = self.prev[0];
                 scalar_1.grad.set(scalar_1.grad.get() + self.grad.get() * (1f32 - scalar_1.data.get().tanh().powf(2f32)));
             }
             _ => (),
